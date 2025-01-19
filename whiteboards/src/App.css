@@ -37,5 +37,11 @@ button[type=submit] {
   margin: 1.5vh;
   min-height:5vh;
   min-width:14.5vw;
-  cursor: pointer;
+}
+
+.button-container {
+  display: flex; /* Use flexbox to align buttons horizontally */
+  gap: 1.5vh; /* Space between the buttons */
+  justify-content: center; /* Center the buttons */
+  margin: -3vh; /* Adjust spacing from input field */
 }

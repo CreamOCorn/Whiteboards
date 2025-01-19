@@ -1,16 +1,20 @@
-import logo from './logo.svg';
+import React from "react";
 import './App.css';
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import Homies from "./Homies";
+import Roomies from "./Roomies";
 
 function App() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <input type="text" id="username" placeholder="Enter Name" required></input>
-      </header>
-      <button type="submit" id="Join">Join</button>
-      <button type="submit" id="Create">Create</button>
-    </div>
+    <Router>
+      <Routes>
+        {/* Default route (home screen) */}
+        <Route path="/" element={<Homies />} />
+
+        {/* Route for room screen */}
+        <Route path="/room/:roomCode" element={<Roomies />} />
+      </Routes>
+    </Router>
   );
 }
 
