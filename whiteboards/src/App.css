@@ -41,7 +41,6 @@ button[type=submit] {
 
 .button-container {
   display: flex; /* Use flexbox to align buttons horizontally */
-  gap: 1.5vh; /* Space between the buttons */
   justify-content: center; /* Center the buttons */
   margin: -3vh; /* Adjust spacing from input field */
 }
