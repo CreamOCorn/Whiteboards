@@ -23,15 +23,9 @@ function Homies() {
   };
 
   // users click join room, making them a player
-  function handleJoinRoom(){
-    let roomCode = document.getElementById("username").value.trim();
-    roomCode = roomCode.toUpperCase();
-    if (roomCode) {
-      navigate(`/room/${roomCode}?role=player`);
-    } else {
-      alert("Please enter a valid room code to join!");
-    }
-  };  
+  function handleRedirectToJoinRoom() {
+    navigate("/join-room");
+  }
 
   return (
     <div className="App">
@@ -39,7 +33,7 @@ function Homies() {
         <img src={logo} className="App-logo" alt="logo" />
         <input type="text" id="username" placeholder="Enter Name" required />
         <div className="button-container">
-            <button type="submit" id="Join" onClick={handleJoinRoom}>
+            <button type="submit" id="Join" onClick={handleRedirectToJoinRoom}>
             Join
             </button>
             <button type="submit" id="Create" onClick={handleCreateRoom}>

@@ -7,7 +7,8 @@ function Roomies() {
     const queryParams = new URLSearchParams(location.search);
     const role = queryParams.get("role"); // "judge" or null (player)
   
-    return ( // obviously we wouldnt have the 
+    return (
+      <div>
         <h1>Room Code: {roomCode}</h1> 
         {role === "judge" ? (
           <button>Start</button> // Judge sees "Start"
