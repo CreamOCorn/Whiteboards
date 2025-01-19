@@ -6,20 +6,13 @@ function App() {
     <div className="App">
       <header className="App-header">
         <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
+        <input type="text" id="username" placeholder="Enter Name" required></input>
       </header>
+      <button type="submit" id="Join">Join</button>
+      <button type="submit" id="Create">Create</button>
     </div>
   );
 }
+
 
 export default App;
