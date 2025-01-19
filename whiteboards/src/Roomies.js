@@ -21,13 +21,14 @@ function Roomies() {
   }
   
   //connecting to backend
-  const mongoose = require("mongoose");
+  // const mongoose = require("mongoose");
 
-  const RoomSchema = new mongoose.Schema({
-    roomCode: { type: String, required: true, unique: true }, // Unique code for the room
-    players: [{ name: String, id: String }], // Players in the room
-    maxPlayers: { type: Number, default: 9, immutable: true } // I am not allowing more than 9 ppl fuk dat
-  });
+  // const RoomSchema = new mongoose.Schema({
+  //   roomCode: { type: String, required: true, unique: true }, // Unique code for the room
+  //   players: [{ name: String, id: String }], // Players in the room
+  //   maxPlayers: { type: Number, default: 9, immutable: true } // I am not allowing more than 9 ppl fuk dat
+  // });
 
-  module.exports = mongoose.model("Room", RoomSchema);
+  // module.exports = mongoose.model("Room", RoomSchema);
+  
   export default Roomies;

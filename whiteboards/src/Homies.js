@@ -16,15 +16,26 @@ function Homies() {
     return code;
   };
 
+  
   // users click create room, making themselves the host
   function handleCreateRoom(){
-    const roomCode = generateRoomCode();
-    navigate(`/room/${roomCode}?role=judge`);
+    let user = document.getElementById("username").value.trim();
+    if (user) {
+      const roomCode = generateRoomCode();
+      navigate(`/room/${roomCode}?role=judge`);
+    } else {
+      alert("Please enter your name.");
+    }
   };
 
   // users click join room, making them a player
   function handleRedirectToJoinRoom() {
-    navigate("/join-room");
+    let user = document.getElementById("username").value.trim();
+    if (user) {
+      navigate("/join-room");
+    } else {
+      alert("Please enter your name.");
+    }
   }
 
   return (

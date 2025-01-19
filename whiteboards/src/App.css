@@ -26,7 +26,6 @@
 #username {
   min-width:30vw;
   text-align: center;
-
 }
 
 button[type=submit] {
@@ -37,6 +36,11 @@ button[type=submit] {
   margin: 1.5vh;
   min-height:5vh;
   min-width:14.5vw;
+  
+}
+
+button[type=submit]:hover {
+  cursor: pointer;
 }
 
 .button-container {
