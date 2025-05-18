@@ -1,4 +1,4 @@
-//Login.jsx
+//Login.jsx THIS IS THE HOME PAGE
 
 import React from 'react';
 import { useState } from "react"
@@ -8,17 +8,19 @@ import "./Login.css";
 export function Login({ onSubmit }) {
   const [username, setUsername] = useState("")
 
+  //make each button do a different ting
   const handleSubmit = (event) => {
     event.preventDefault();
     const clickedButtonId = event.nativeEvent.submitter.id;
 
     if (clickedButtonId === 'Join') {
-      onSubmit({ type: 'join', username }); // Pass an object indicating the action
+      onSubmit({ type: 'join', username }); 
     } else if (clickedButtonId === 'Create') {
-      onSubmit({ type: 'create', username }); // Pass an object indicating the action
+      onSubmit({ type: 'create', username }); 
     }
   };
 
+  //the html for the home page aka the username and the join/create buttons
   return (
     <>
     <div className="App">

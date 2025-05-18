@@ -4,6 +4,7 @@ import useWebSocket from 'react-use-websocket'
 import {useEffect, useRef} from 'react'
 import throttle from 'lodash.throttle'
 
+//Creating a list of all the active users in the room
 const renderUsersList = users => {
     return (
       <ul>
@@ -16,8 +17,7 @@ const renderUsersList = users => {
 
 export function Roomies ({username, role}) {
 
-    //append name to end of url and send it to backend
-    // Append name, role, and roomCode to the end of the URL and send it to the backend
+    // Append name, role to the end of the URL and send it to the backend
   const WS_URL = `ws://127.0.0.1:8000`;
   const { sendJsonMessage, lastJsonMessage } = useWebSocket(WS_URL, {
     share: true,
@@ -51,7 +51,8 @@ export function Roomies ({username, role}) {
 
 export default Roomies;
 
-//the stuff from the original thing
+//the html stuff from the original Roomies file
+
 // import React from "react";
 // import { useParams, useLocation } from "react-router-dom";
 

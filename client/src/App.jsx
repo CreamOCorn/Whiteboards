@@ -1,13 +1,13 @@
 //App.jsx
 
-import React, {useState} from 'react';
+import {useState} from 'react';
 import {Routes, Route, useNavigate } from 'react-router-dom';
 import {Login} from './components/Login'
 import JoinRoomies from './components/JoinRoomies';
 import Roomies from './Roomies'
 
+//THIS IS WHERE ALL THE DIRECTORIES AND SHIT ARE
 function App() {
-  console.log("App component is rendering!");
   const [username, setUsername] = useState("")
   const [role, setRole] = useState('');
   const navigate = useNavigate();
@@ -20,11 +20,12 @@ function App() {
     if (submissionData.type === 'join') {
       navigate('/join'); // Redirect to join room page for players
     } else if (submissionData.type === 'create') {
-      navigate(`/room`); //deal with code stuff later
+      navigate(`/room`); //deal with room code stuff later, for now there is only 1 room lol
     }
 
   };
 
+  //when the user clicks "play" on joinroomies, redirect to the correct room
   const handleRoomJoin = () => {
     navigate(`/room`); //deal with room code stuff later
   };

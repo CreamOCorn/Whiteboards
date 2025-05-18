@@ -12,11 +12,11 @@ function JoinRoomies({username, onJoin}) {
   const handleJoinRoom = (event) => {
     event.preventDefault(); // Prevent default form submission
     if (roomCode) {
-        onJoin(roomCode); // Pass the entered room code back to App
-        // App's handleJoinRoomSubmit will now handle the navigation to /room/:roomCode
+        onJoin(roomCode); // Pass the entered room code back to App but i'm gonna do this later bruh
     } 
   };
 
+  //it looks exactly like the home page but now allows you to enter room code
   return (
     <div className="App">
           <header className="App-header">
@@ -32,7 +32,7 @@ function JoinRoomies({username, onJoin}) {
                 />
                 <div className="button-container">
                     <button type="submit" id="Join">
-                    Join
+                    Play
                     </button>
                     <button type="button" onClick={() => navigate('/')}>
                     Back
