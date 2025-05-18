@@ -1,0 +1,64 @@
+*{
+  font-family:'Courier New', Courier, monospace;
+  font-size: calc(20px + 3vmin);
+}
+
+.App {
+  text-align: center;
+}
+
+.App-logo {
+  height: 40vmin;
+  margin-top: 2rem;
+  pointer-events: none;
+  user-select: none;
+  }
+
+.App-header {
+  background-color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem; /* Add consistent spacing between elements */
+}
+
+form {
+  display: flex; /* Make the form a flex container */
+  flex-direction: column; /* Stack the input and button container vertically */
+  align-items: center; /* Center items horizontally within the form */
+  /* Add other form styles as needed */
+}
+
+#username {
+  min-width:30vw;
+  text-align: center;
+  margin-bottom: 0.5vh
+}
+
+.button-container {
+  display: flex; /* Make the button container a flex container */
+  width: 100%;
+}
+
+button {
+  flex: 1; /* Make each button take up equal available space */
+  background-color: rgb(0, 0, 0);
+  border: none;
+  color: white;
+  text-decoration: none;
+  margin-top: 1.5vh;
+  min-height:5vh;
+}
+
+.button-container button[type="submit"]:first-child {
+  margin-right: 1.5vh;
+}
+
+.button-container button[type="submit"]:last-child {
+  margin-left: 1.5vh;
+}
+
+button:hover {
+  cursor: pointer;
+}
