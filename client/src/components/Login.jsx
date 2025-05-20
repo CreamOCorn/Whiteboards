@@ -1,6 +1,5 @@
 //Login.jsx THIS IS THE HOME PAGE
 
-import React from 'react';
 import { useState } from "react"
 import logo from "../assets/logo.svg";
 import "./Login.css";

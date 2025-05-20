@@ -3,6 +3,8 @@
 import useWebSocket from 'react-use-websocket'
 import {useEffect, useRef} from 'react'
 import throttle from 'lodash.throttle'
+import logo from "./assets/logo.svg";
+import "./Roomies.css"
 
 //Creating a list of all the active users in the room
 const renderUsersList = users => {
@@ -43,10 +45,22 @@ export function Roomies ({username, role}) {
   
       if (lastJsonMessage) {
         return <>
-            {renderUsersList(lastJsonMessage)}
+        <div className="Room">
+          <div class="Top">
+            <img src={logo} className="Logo"/>
+            <p className="Code">Code: ABCDE</p>
+          </div>
+          <div>
+            <button type="submit" id="Join">
+            Leave
+            </button>
+          </div>
+          <h1>Hello {role} {username}</h1>
+          {renderUsersList(lastJsonMessage)}
+        </div>
         </>
       }
-    return <h1>Hello {role} {username}</h1>
+    
 }
 
 export default Roomies;
