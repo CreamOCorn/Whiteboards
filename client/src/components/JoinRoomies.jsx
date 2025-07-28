@@ -1,20 +1,56 @@
 //JoinRoomies.jsx
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import logo from "../assets/logo.svg";
 import "./Login.css";
 
-function JoinRoomies({username, onJoin}) {
+function JoinRoomies({ username, uuid, onJoin }) {
   const [roomCode, setRoomCode] = useState("");
   const navigate = useNavigate();
 
-  const handleJoinRoom = (event) => {
-    event.preventDefault(); // Prevent default form submission
-    if (roomCode) {
-        onJoin(roomCode); // Pass the entered room code back to App but i'm gonna do this later bruh
-    } 
+  //redirect if refresh
+   useEffect(() => {
+    if (!username) {
+      console.log("No username found, redirecting to home.");
+      navigate('/'); // Redirect to login page if no username
+    }
+  }, [username, navigate]); 
+
+  const handleJoinRoom = async (event) => {
+    event.preventDefault();
+    const code = roomCode.trim().toUpperCase();
+
+    if (!code) return;
+
+    try {
+      // Call backend to check if room exists
+      const response = await fetch(`http://localhost:8000/check-room?code=${code}`);
+      if (response.ok) {
+        const data = await response.json();
+        console.log(data);
+        if (data.exists) {
+          //did it already start
+            if (data.gameStarted) {
+                alert('The game has already started in this room. You cannot join at this time.');
+            } else if (data.userCount >= 9) {
+              alert('The room is already occupied by the max number of users. You cannot join at this time.');
+            } else {
+              // if not, navigate to room page
+              onJoin(code);
+            }
+        } else {
+          alert("Invalid room code");
+        }
+      } else {
+        alert("Invalid room code");
+      }
+    } catch (error) {
+      alert("Error checking room code. Please try again.");
+      console.error(error);
+    }
   };
+
 
   //it looks exactly like the home page but now allows you to enter room code
   return (

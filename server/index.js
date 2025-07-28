@@ -1,86 +1,368 @@
 //index.js the backend
-
 const http = require('http')
-const {WebSocketServer} = require('ws')
-
+const { WebSocketServer } = require('ws')
 const url = require('url')
-const uuidv4 = require("uuid").v4 //method that generates random id's
+const uuidv4 = require("uuid").v4 // method that generates random id's
+require('dotenv').config()
 
-const server = http.createServer()
-const wsServer = new WebSocketServer({server})
-const port = 8000 //just a port to pass info
+const port = 8000 // just a port to pass info
 
-const connections = {} //the connections dictionary of every online user
-const users = {} //user dictionary of user's information 
+const rooms = {}; // hold all rooms and their users/connections
 
-
-//event handlers
-const broadcast = () => {//handles what everyone receives
-    Object.keys(connections).forEach(uuid => {
-        const connection = connections[uuid]
-        const message = JSON.stringify(users)
-        connection.send(message)
-    })
-}
-const handleMessage = (bytes, uuid) => { //message = state
-    // message = {"x": 0, "y": 100}
-
-    const message = JSON.parse(bytes.toString())
-    const user = users[uuid]
-    user.state = message
-
-    broadcast()
-    
-    console.log(
-        `${user.role} ${user.username} updated their updated state: ${JSON.stringify(
-          user.state,
-        )}`,
-      )
-}
-const handleClose = uuid => {
-
-    console.log(`${users[uuid].role} ${users[uuid].username} disconnected`)
-    delete connections[uuid]
-    delete users[uuid]
-
-    broadcast()
-
+// Generate 5-letter uppercase room code
+function generateRoomCode() {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  return Array.from({ length: 5 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
 }
 
+function createUniqueRoomCode() {
+  let code;
+  do {
+    code = generateRoomCode();
+  } while (rooms[code]); // If room already exists, generate again
+  return code;
+}
+
+// Create HTTP server first
+const server = http.createServer((req, res) => {
+  // Allow CORS for local dev
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  if (req.method === "OPTIONS") {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+
+  if (req.method === "POST" && req.url === "/create-room") {
+    const roomCode = createUniqueRoomCode();
+
+    // Initialize room with empty users and connections
+     rooms[roomCode] = {
+      users: {},
+      connections: {},
+      gameStarted: false,
+      judgeUUID: null,
+      currentPrompt: null, // Store current prompt
+      drawings: {} // Store drawings temporarily
+    };
+
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ roomCode }));
+
+   } else if (req.method === "GET" && req.url.startsWith("/check-room")) {
+    const parsedUrl = url.parse(req.url, true);
+    const roomCode = parsedUrl.query.code?.toUpperCase();
+
+    if (roomCode && rooms[roomCode]) {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ 
+        exists: true,
+        gameStarted: rooms[roomCode].gameStarted, 
+        userCount: Object.keys(rooms[roomCode].users).length
+      }));
+    } else {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ exists: false, gameStarted: false }));
+    }
+    return;
+  } else {
+    // For any other requests, respond 404
+    res.writeHead(404);
+    res.end();
+  }
+});
+
+// Then create WebSocketServer with the HTTP server
+const wsServer = new WebSocketServer({ server });
+
+// WebSocket connection handler
 wsServer.on("connection", (connection, request) => {
-    //we will send a url with like ws://localhost:3000?username=Annie
-    //and this will take the username Annie and send it to server
+  // We will send a url like ws://localhost:8000?username=Annie&room=ABCDE
+  // and this will take the username Annie and room code and process them
 
-    const parsedUrl = url.parse(request.url, true);
-    const queryParams = parsedUrl.query;
+  const parsedUrl = url.parse(request.url, true);
+  const queryParams = parsedUrl.query;
 
-    const username = queryParams.username; // Access directly
-    const role = queryParams.role;     // Access directly
+  const username = queryParams.username; // Access username directly
+  let uuid = queryParams.uuid;           // get uuid from frontend if any
+  const roomCode = queryParams.room;     // get room code from frontend
 
-   //uuid means "universally unique identifier"
-   //generate id for each user (& help differentiate between ppl with same username)
-   const uuid = uuidv4() 
-   
+  // fallback: if frontend didn't send uuid, generate one anyway
+  if (!uuid) {
+    uuid = uuidv4();
+    console.log("Warning: no UUID passed from client, generated new one:", uuid);
+  }
 
-   console.log(`Joining as ${role} with username: ${username}`) //writes the username in terminal for debugging purposes
-   console.log(uuid)
+  // Require username and room to accept connection
+  if (!username || !roomCode) {
+    console.log(`Connection rejected: missing username or room`);
+    connection.close();
+    return;
+  }
 
-   //this is a connections dictionary, which will store all of our current users
-   //useful when we need to "broadcast" a message to everyone at once
-   //because to send to all users, we can just loop over the dictionary
-   connections[uuid] = connection
+  const room = roomCode.toUpperCase();
 
-   users[uuid] = { //adds the user into the dictionary and lets us store their info
-        username: username,
-        role: role,
-        state: { }//put anything in here for what they are doing
-   }
+  // Check if room exists
+  if (!rooms[room]) {
+    console.log(`Connection rejected: room ${room} does not exist`);
+    connection.close();
+    return;
+  }
 
-   //"listening events" aka what the server should do when it gets information from the user
-   connection.on("message", message => handleMessage(message, uuid))
-   connection.on("close", () => handleClose(uuid))
-})
+  // Check if game has already started and this is a new connection
+  if (rooms[room].gameStarted) {
+    console.log(`Connection rejected: game already started in room ${room}`);
+    connection.close();
+    return;
+  }
 
-server.listen(port, () => { //tell us if the server is running
-    console.log(`Websocket server is running on port ${port}`)
-})
+  //check if the room is full
+  if (Object.keys(rooms[room].users).length >= 9) {
+    console.log(`Connection rejected: room ${room} is full`);
+    connection.close();
+    return;
+  }
+
+  console.log(`Joining username: ${username} with uuid ${uuid} to room ${room}`);
+
+  // Store connection and user info in the room
+  rooms[room].connections[uuid] = connection;
+  
+  // If user doesn't exist, create them (new user)
+  if (!rooms[room].users[uuid]) {
+    rooms[room].users[uuid] = {
+      username: username,
+      isReady: false
+    };
+  }
+
+  // Set judge if this is the first user
+  if (!rooms[room].judgeUUID) {
+    rooms[room].judgeUUID = uuid;
+  }
+
+  // Function to broadcast room users state
+  function broadcastRoom() {
+    const message = JSON.stringify(rooms[room].users);
+    Object.values(rooms[room].connections).forEach(conn => {
+      conn.send(message);
+    });
+  }
+
+  // Broadcast initial state to room (only if game hasn't started)
+  if (!rooms[room].gameStarted) {
+    broadcastRoom();
+  }
+
+  // Listen to messages from client
+  connection.on("message", async message => {
+    const parsedMsg = JSON.parse(message);
+    console.log("Received WebSocket message:", parsedMsg);
+    const user = rooms[room].users[uuid];
+    if (!user) return;
+
+    let shouldBroadcast = false; // Flag to control broadcasting
+
+    switch (parsedMsg.type) {
+      case "ready":
+        user.isReady = true;
+        shouldBroadcast = true;
+        console.log(`${user.username} is now READY in room ${room}`);
+        break;
+      case "unready":
+        user.isReady = false;
+        shouldBroadcast = true;
+        console.log(`${user.username} is now UNREADY in room ${room}`);
+        break;
+      case "countdown_finished": {
+        // Only let the judge trigger this
+        if (rooms[room]?.countdownStarted) {
+          //do nothing if it was already sent
+          return;
+        }
+
+        const countdownStartTime = Date.now();
+        const roomTimeLimit = rooms[room].timeLimit || 60;
+
+        // Mark as sent so we don't rebroadcast again
+        rooms[room].countdownStarted = true;
+
+        const countdownFinishedPayload = {
+          type: "countdown_finished",
+          timeLimit: roomTimeLimit,
+          startTime: countdownStartTime
+        };
+
+        console.log("✅ Sending countdown_finished with:", countdownFinishedPayload);
+
+        const msg = JSON.stringify(countdownFinishedPayload);
+        Object.values(rooms[room].connections).forEach(conn => {
+          if (conn.readyState === 1) {
+            conn.send(msg);
+          }
+        });
+
+        return;
+      }
+      case "start_round":
+        const judgeUUID = rooms[room].judgeUUID;
+        if (uuid !== judgeUUID) return;
+
+        // Mark game as started
+        rooms[room].gameStarted = true;
+
+        const payload = JSON.stringify({
+          type: "round_started",
+          users: rooms[room].users //list of everyone int he room
+        });
+
+        Object.values(rooms[room].connections).forEach(conn => conn.send(payload));
+        console.log(`Game started in room ${room}`);
+        return; // Exit early, no need to broadcast
+      /////// stuff for the game round
+      case "send_prompt": {
+        const { prompt, timeLimit } = parsedMsg;
+
+        rooms[room].prompt = prompt;
+        rooms[room].timeLimit = timeLimit;
+        rooms[room].countdownStarted = false; // reset
+
+        const message = JSON.stringify({
+          type: "prompt_sent",
+          prompt,
+          timeLimit
+        });
+
+        Object.values(rooms[room].connections).forEach(conn => {
+          if (conn.readyState === 1) {
+            conn.send(message);
+          }
+        });
+
+        return;
+      }
+      case "submit_drawing":
+        // Handle when players submit their drawings
+        user.drawingData = parsedMsg.drawingData;
+        user.submittedAt = Date.now();
+        user.isDrawingSubmitted = true;
+        
+        // Store in room temporarily for judge review
+        rooms[room].drawings[uuid] = {
+          username: user.username,
+          drawingData: parsedMsg.drawingData,
+          submittedAt: new Date().toLocaleTimeString(),
+          drawingId: null // No longer using MongoDB ID
+        };
+
+        // Broadcast to all clients (especially judge) that this player submitted
+        const drawingSubmittedPayload = JSON.stringify({
+          type: "player_drawing_submitted",
+          playerId: uuid,
+          username: user.username,
+          submittedAt: new Date().toLocaleTimeString(),
+          isAutoSubmit: parsedMsg.isAutoSubmit || false
+        });
+
+        Object.values(rooms[room].connections).forEach(conn => {
+          if (conn.readyState === 1) {
+            conn.send(drawingSubmittedPayload);
+          }
+        });
+        
+        console.log(`${user.username} submitted drawing in room ${room}`);
+        return;
+
+      case "get_drawings":
+        // everyone see all drawings in review stage
+        const drawingsPayload = JSON.stringify({
+          type: "drawings_for_review",
+          drawings: rooms[room].drawings,
+          prompt: rooms[room].prompt
+        });
+        Object.values(rooms[room].connections).forEach(conn => {
+          if (conn.readyState === 1) {
+            conn.send(drawingsPayload);
+          }
+        });
+        return;
+      case "end_round":
+        // Only judge can end rounds
+        const endJudgeUUID = rooms[room].judgeUUID;
+        if (uuid !== endJudgeUUID) return;
+
+        const endPayload = JSON.stringify({
+          type: "round_ended",
+          results: parsedMsg.results || []
+        });
+
+        Object.values(rooms[room].connections).forEach(conn => conn.send(endPayload));
+        return; // Exit early, no need to broadcast
+        
+      default:
+        // For other messages (like "has connected"), don't broadcast or log
+        user.state = parsedMsg;
+        return; // Exit early, no broadcasting needed
+    }
+
+    // Only broadcast if the flag is set
+    if (shouldBroadcast) {
+      broadcastRoom();
+    }
+  });
+
+  // Cleanup on disconnect
+  connection.on("close", () => {
+    console.log(`${username} disconnected from room ${room}`);
+  
+    if (!rooms[room]) return;
+    
+    // Remove user and connection
+      if (rooms[room].users[uuid]) {
+        delete rooms[room].users[uuid];
+      }
+
+      if (rooms[room].connections[uuid]) {
+        delete rooms[room].connections[uuid];
+      }
+
+    // Check if the disconnected user was the judge
+    const judgeUUID = rooms[room].judgeUUID;
+    // If judge disconnected, kick everyone and delete room
+    if (rooms[room].gameStarted && uuid === judgeUUID) {
+          const kickMessage = JSON.stringify({
+          type: "judge_disconnected",
+          message: "The judge has left the game. Returning to home."
+        });
+        
+        Object.values(rooms[room].connections).forEach(conn => {
+          conn.send(kickMessage);
+          conn.close();
+        });
+        
+        // Delete the room
+        delete rooms[room];
+        console.log(`Room ${room} deleted because judge disconnected`);
+        return;
+    }
+
+    // If room empty, delete it
+    if (Object.keys(rooms[room].users).length === 0) {
+      delete rooms[room];
+      console.log(`Room ${room} deleted because empty`);
+    } else {
+      // If game hasn't started, broadcast updated room state
+      if (!rooms[room].gameStarted) {
+        broadcastRoom();
+      }
+    }
+  });
+});
+
+// Start the server listening (MongoDB removed)
+server.listen(port, () => {
+  console.log(`Websocket server is running on port ${port}`)
+});

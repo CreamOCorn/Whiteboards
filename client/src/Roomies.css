@@ -1,3 +1,4 @@
+
 .Top {
     display: flex;
     justify-content: center; 
@@ -18,3 +19,89 @@
     right: 3vw; 
     font-size: xx-large;
 }
+
+.Row-Of-Shit{
+    display: flex;
+    justify-content: center; 
+    align-items: center;
+    width: 100%;
+    position: relative; 
+}
+
+.leaveButton {
+    margin-left: 11vw;
+    margin-right: 11vw;
+}
+
+.JudgeBox {
+    justify-content: center; 
+    align-items: center;
+}
+
+.NameBox {
+    text-align: center;
+    font-size: larger;
+    border-width:2px;
+    border-style:solid;
+    border-color:rgb(126, 126, 126);
+    height: 10vh;
+    width: 30vw;
+    overflow: auto;
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.RoleLabel {
+    font-size: xx-large;
+    color:rgb(126, 126, 126);
+    margin-top: 1vh;
+}
+
+.Spacer {
+    margin-top: 7vh;
+}
+.PlayerGrid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    
+    margin-left: 11vw;
+    margin-right: 11vw;
+
+    gap: 1vw;
+}
+
+.NameBoxPlayer {
+    border-style: solid;
+    border-width: 1px;
+    border-color:rgb(126, 126, 126);
+    padding: 15px;
+    text-align: center;
+    height: 10vh; 
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: smaller;
+    overflow: auto;
+}
+
+
+/* GameRoundCSS */
+.loading {
+    margin-top: 25vh;
+}
+
+.loading::after {
+      display: inline-block;
+      animation: dotty steps(1,end) 5s infinite;
+      content: '';
+    }
+    
+    @keyframes dotty {
+        0%   { content: ''; }
+        25%  { content: '.'; }
+        50%  { content: '..'; }
+        75%  { content: '...'; }
+        100% { content: ''; }
+    }

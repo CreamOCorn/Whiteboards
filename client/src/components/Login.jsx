@@ -2,21 +2,45 @@
 
 import { useState } from "react"
 import logo from "../assets/logo.svg";
+import { v4 as uuidv4 } from "uuid";
 import "./Login.css";
 
+
 export function Login({ onSubmit }) {
-  const [username, setUsername] = useState("")
+  const [username, setUsername] = useState("") //username is the value the user types in, setUsername is the function that updates username
+
+
 
   //make each button do a different ting
-  const handleSubmit = (event) => {
-    event.preventDefault();
-    const clickedButtonId = event.nativeEvent.submitter.id;
+  const handleSubmit = async (event) => {
+    event.preventDefault(); //do not reload i beg!!
+    const clickedButtonId = event.nativeEvent.submitter.id; //grabs whether they clicked "join" or "submit"
+    if (!username.trim()) return; //require a username
 
-    if (clickedButtonId === 'Join') {
-      onSubmit({ type: 'join', username }); 
-    } else if (clickedButtonId === 'Create') {
-      onSubmit({ type: 'create', username }); 
+    const uuid = uuidv4(); //unique uuid for every player
+
+    if (clickedButtonId === "Join") {
+      // For joining, just call onSubmit like before 
+      onSubmit({ type: "join", username: username.trim(), uuid });
+    } else if (clickedButtonId === "Create") {
+      try {
+        // Call your backend to create a room
+        const response = await fetch("http://localhost:8000/create-room", {
+          method: "POST",
+        });
+        if (!response.ok) throw new Error("Failed to create room");
+
+        const data = await response.json(); //it should return smth like { roomCode: "ABCDE" }
+        const roomCode = data.roomCode;
+
+        // Now send that roomCode back via onSubmit
+        onSubmit({ type: "create", username: username.trim(), uuid, roomCode });
+      } catch (error) {
+        console.error(error);
+        alert("Error creating room");
+      }
     }
+
   };
 
   //the html for the home page aka the username and the join/create buttons

@@ -5,41 +5,64 @@ import {Routes, Route, useNavigate } from 'react-router-dom';
 import {Login} from './components/Login'
 import JoinRoomies from './components/JoinRoomies';
 import Roomies from './Roomies'
+import GameRound from './GameRound';
+import { WebSocketProvider } from './components/WebSocketContext';
 
 //THIS IS WHERE ALL THE DIRECTORIES AND SHIT ARE
 function App() {
   const [username, setUsername] = useState("")
+   const [uuid, setUUID] = useState("");
   const [role, setRole] = useState('');
+  const [room, setRoom] = useState('');
   const navigate = useNavigate();
 
   //when we submit our data on the login page, then it will append either "player or judge"
-  const handleLoginSubmit = (submissionData) => {
-    setUsername(submissionData.username);
-    setRole(submissionData.type === 'join' ? 'player' : 'judge');
+const handleLoginSubmit = async (submissionData) => {
+  setUsername(submissionData.username);
+  setUUID(submissionData.uuid);
+  setRole(submissionData.type === 'join' ? 'player' : 'judge');
 
-    if (submissionData.type === 'join') {
-      navigate('/join'); // Redirect to join room page for players
-    } else if (submissionData.type === 'create') {
-      navigate(`/room`); //deal with room code stuff later, for now there is only 1 room lol
+  if (submissionData.type === 'join') {
+      setRole('player');
+      navigate('/join');
+  } else if (submissionData.type === 'create') {
+    try {
+      const response = await fetch('http://localhost:8000/create-room', { method: 'POST' });
+      if (!response.ok) throw new Error('Failed to create room');
+
+      const data = await response.json();
+      const roomCode = data.roomCode;
+
+      setRoom(roomCode);       // Save room code to state
+      setRole('judge');        // You are the judge
+      navigate('/room');       // Clean URL
+    } catch (error) {
+      console.error('Error creating room:', error);
+      alert('Error creating room, please try again.');
     }
-
-  };
+  }
+};
 
   //when the user clicks "play" on joinroomies, redirect to the correct room
-  const handleRoomJoin = () => {
-    navigate(`/room`); //deal with room code stuff later
+  const handleRoomJoin = (roomCodeFromJoinPage) => {
+    setRoom(roomCodeFromJoinPage); // Set room code for joined room
+    setRole('player'); // Ensure role is player for joined room
+    navigate('/room'); // Navigate after setting state
   };
 
   return (
     <div className="App">
-      <Routes>
-        {/* our home actual path */}
-        <Route path="/" element={<Login onSubmit={handleLoginSubmit} />} /> 
-        
-        {/* the paths we can leads down to after submitting our username */}
-        <Route path="/join" element={<JoinRoomies username={username} onJoin={handleRoomJoin} />} />
-        <Route path="/room" element={<Roomies username={username} role={role} />} />
-      </Routes>
+      <WebSocketProvider>
+        <Routes>
+          {/* our home actual path */}
+          <Route path="/" element={<Login onSubmit={handleLoginSubmit} />} /> 
+          
+          {/* the paths we can leads down to after submitting our username */}
+          <Route path="/join" element={<JoinRoomies username={username} uuid={uuid} onJoin={handleRoomJoin} />} />
+          <Route path="/room" element={<Roomies username={username} uuid={uuid} role={role} room={room} />} />
+          <Route path="/game" element={<GameRound username={username} uuid={uuid} role={role} room={room} />} />
+        </Routes>
+      </WebSocketProvider>
     </div>
   )
 }
