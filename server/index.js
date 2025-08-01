@@ -135,7 +135,8 @@ wsServer.on("connection", (connection, request) => {
   if (!rooms[room].users[uuid]) {
     rooms[room].users[uuid] = {
       username: username,
-      isReady: false
+      isReady: false,
+      totalPoints: 0
     };
   }
 
@@ -291,21 +292,45 @@ wsServer.on("connection", (connection, request) => {
         return;
       case "end_round":
         // Only judge can end rounds
-        const endJudgeUUID = rooms[room].judgeUUID;
-        if (uuid !== endJudgeUUID) return;
+          const endJudgeUUID = rooms[room].judgeUUID;
+          if (uuid !== endJudgeUUID) return;
 
-        const endPayload = JSON.stringify({
-          type: "round_ended",
-          results: parsedMsg.results || []
-        });
+          // Award points if provided
+          if (parsedMsg.pointsToAward) {
+            Object.entries(parsedMsg.pointsToAward).forEach(([playerId, points]) => {
+              if (rooms[room].users[playerId]) {
+                rooms[room].users[playerId].totalPoints += points;
+                console.log(`Awarded ${points} points to ${rooms[room].users[playerId].username}`);
+              }
+            });
+          }
 
-        Object.values(rooms[room].connections).forEach(conn => conn.send(endPayload));
-        return; // Exit early, no need to broadcast
-        
-      default:
-        // For other messages (like "has connected"), don't broadcast or log
-        user.state = parsedMsg;
-        return; // Exit early, no broadcasting needed
+          const endPayload = JSON.stringify({
+            type: "round_ended",
+            results: parsedMsg.results || [],
+            updatedUsers: rooms[room].users // Send updated user data with points
+          });
+
+          Object.values(rooms[room].connections).forEach(conn => conn.send(endPayload));
+          return;
+      case "end_game":
+          const endGamePayload = JSON.stringify({ type: "game_ended" });
+          Object.values(rooms[room].connections).forEach(conn => {
+            if (conn.readyState === 1) conn.send(endGamePayload);
+          });
+          return;
+      case "reset_round":
+          // Reset prompt, drawings, countdown, etc.
+          rooms[room].prompt = null;
+          rooms[room].drawings = {};
+          rooms[room].countdownStarted = false;
+
+          // Tell everyone to reset their round state
+          const resetPayload = JSON.stringify({ type: "reset_round" });
+          Object.values(rooms[room].connections).forEach(conn => {
+            if (conn.readyState === 1) conn.send(resetPayload);
+          });
+          return;
     }
 
     // Only broadcast if the flag is set
@@ -314,55 +339,86 @@ wsServer.on("connection", (connection, request) => {
     }
   });
 
+
   // Cleanup on disconnect
-  connection.on("close", () => {
+connection.on("close", () => {
     console.log(`${username} disconnected from room ${room}`);
-  
-    if (!rooms[room]) return;
-    
-    // Remove user and connection
-      if (rooms[room].users[uuid]) {
-        delete rooms[room].users[uuid];
-      }
 
-      if (rooms[room].connections[uuid]) {
-        delete rooms[room].connections[uuid];
-      }
-
-    // Check if the disconnected user was the judge
-    const judgeUUID = rooms[room].judgeUUID;
-    // If judge disconnected, kick everyone and delete room
-    if (rooms[room].gameStarted && uuid === judgeUUID) {
-          const kickMessage = JSON.stringify({
-          type: "judge_disconnected",
-          message: "The judge has left the game. Returning to home."
-        });
-        
-        Object.values(rooms[room].connections).forEach(conn => {
-          conn.send(kickMessage);
-          conn.close();
-        });
-        
-        // Delete the room
-        delete rooms[room];
-        console.log(`Room ${room} deleted because judge disconnected`);
+    // Exit early if the room no longer exists for some reason
+    if (!rooms[room]) {
         return;
     }
 
-    // If room empty, delete it
-    if (Object.keys(rooms[room].users).length === 0) {
-      delete rooms[room];
-      console.log(`Room ${room} deleted because empty`);
-    } else {
-      // If game hasn't started, broadcast updated room state
-      if (!rooms[room].gameStarted) {
-        broadcastRoom();
-      }
-    }
-  });
-});
+    const isJudge = uuid === rooms[room].judgeUUID;
 
-// Start the server listening (MongoDB removed)
+    // --- Step 1: Remove the disconnected user immediately ---
+    // This is the most crucial change. We must update the room's state
+    // before we start checking for conditions.
+    delete rooms[room].users[uuid];
+    delete rooms[room].connections[uuid];
+    delete rooms[room].drawings[uuid];
+
+    // --- Step 2: Handle the judge's disconnection first ---
+    // If the judge was the one who just left, the game is over for everyone.
+    if (isJudge) {
+        console.log(`Judge disconnected from room ${room}. Kicking all remaining players.`);
+        const kickMessage = JSON.stringify({
+            type: "judge_disconnected",
+            message: "The judge has left the game. Returning to home."
+        });
+        
+        // Loop through the remaining connections and send the kick message
+        Object.values(rooms[room].connections).forEach(conn => {
+            if (conn.readyState === conn.OPEN) {
+                conn.send(kickMessage);
+                conn.close(); // Close their connection too
+            }
+        });
+        
+        delete rooms[room];
+        return; // Stop execution here
+    }
+
+    // --- Step 3: Handle player disconnection scenarios ---
+    const nonJudgeUsers = Object.keys(rooms[room].users).filter(id => id !== rooms[room].judgeUUID);
+    const nonJudgeConnections = Object.values(rooms[room].connections).filter(conn => conn.uuid !== rooms[room].judgeUUID);
+
+    // If all players (non-judge) have left, tell the judge to disconnect.
+    if (nonJudgeUsers.length === 0 && rooms[room].gameStarted) {
+        console.log(`All players have left room ${room}. Notifying judge to disconnect.`);
+        
+        const allPlayersLeftMessage = JSON.stringify({ type: "all_players_left" });
+        
+        // Send a message to the judge's connection, if it exists
+        const judgeConnection = rooms[room].connections[rooms[room].judgeUUID];
+        if (judgeConnection && judgeConnection.readyState === judgeConnection.OPEN) {
+            judgeConnection.send(allPlayersLeftMessage);
+            judgeConnection.close(); // Disconnect the judge too
+        }
+        
+        // Clean up the room since it's empty
+        delete rooms[room];
+        return; // Stop execution here
+    }
+
+    // Otherwise, just notify the remaining players about the disconnection
+    if (rooms[room].gameStarted) {
+        const disconnectMessage = JSON.stringify({
+            type: "player_disconnected",
+            playerId: uuid
+        });
+        
+        // Send the message to all remaining non-judge players
+        nonJudgeConnections.forEach(conn => {
+            if (conn.readyState === conn.OPEN) {
+                conn.send(disconnectMessage);
+            }
+        });
+    }
+});
+  });
+
+// Start the server listening 
 server.listen(port, () => {
   console.log(`Websocket server is running on port ${port}`)
 });

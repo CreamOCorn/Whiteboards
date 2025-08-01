@@ -176,7 +176,11 @@ export function Roomies ({ username, uuid, room }) {
         </div>
         <div className="Row-Of-Shit"> 
           {/* the top row of buttons */}
-          <button type="submit" className="leaveButton" onClick={() => navigate('/')}>
+          <button type="submit" className="leaveButton" 
+            onClick={() => {
+                // NAVIGATING DID NOT WORK THIS IS MY 500IQ IDEA
+                window.location.reload();
+            }}>
             Leave
           </button>
           {/* Creator of the room goes up top */}

@@ -4,8 +4,9 @@ import React, { useEffect, useState } from "react";
 import { useWebSocketContext } from './components/WebSocketContext';
 import DrawingCanvas from './components/DrawingCanvas.jsx';
 import logo from "./assets/logo.svg";
+import "./components/Login.css";
+import "./Roomies.css";
 
-//TODO syncing the times, ADDING TIME TO CURRENT TIMER
 
 export default function GameRound() {
   const { state } = useLocation();
@@ -16,7 +17,7 @@ export default function GameRound() {
   const { username, uuid, room, users } = state || {};
   
   // prompt sending
-  const [gameData, setGameData] = useState(null);
+  const [gameData, setGameData] = useState(null); //why is this unused
   const [receivedPrompt, setReceivedPrompt] = useState(null); //for the users
   const [promptSubmitted, setPromptSubmitted] = useState(false); //for the judge
   const [timeRemaining, setTimeRemaining] = useState(null); // Timer for players
@@ -31,8 +32,10 @@ export default function GameRound() {
   const [prompt, setPrompt] = useState("");
   const [timeLimit, setTimeLimit] = useState(60);
   const [currentCanvasData, setCurrentCanvasData] = useState(null); //current canvas
+  //awards
+  const [selectedPlayers, setSelectedPlayers] = useState({}); // Track which players are selected for scoring
+  const [playerPoints, setPlayerPoints] = useState({}); // Track points to award
 
-  // ADD THIS RIGHT HERE:
   useEffect(() => {
     console.log("currentCanvasData updated:", currentCanvasData ? `Length: ${currentCanvasData.length}` : "null");
   }, [currentCanvasData]);
@@ -43,13 +46,33 @@ export default function GameRound() {
   // Check if all players have submitted
   const allPlayersSubmitted = Object.keys(playerStatuses).length > 0 && Object.values(playerStatuses).every(status => status.ready);
 
-  // Handle disconnection for all users
+    
+    // Handle disconnection for all users
+    let alertShown = false; //avoid double alerts
+    useEffect(() => {
+      if (!isConnected && !alertShown) {
+        alertShown = true;
+        alert("You have disconnected from this game");
+        navigate("/");
+      }
+    }, [isConnected, navigate]);
+
+    //kick everyone if judge left
   useEffect(() => {
-    if (!isConnected) {
-      alert("You have disconnected from this game");
+    if (lastJsonMessage?.type === "judge_disconnected") {
+      // Show alert immediately, then navigate
+      alert("The judge has left the game. Returning home.");
       navigate("/");
     }
-  }, [isConnected, navigate]);
+  }, [lastJsonMessage]);
+
+  // Handle when all players leave
+  useEffect(() => {
+    if (lastJsonMessage?.type === "all_players_left") {
+      alert("All players have left the room. Returning home.");
+      navigate("/");
+    }
+  }, [lastJsonMessage]);
 
   // Listen for game-related messages from the WebSocket
   useEffect(() => {
@@ -105,14 +128,43 @@ export default function GameRound() {
         setTimerStarted(false);
         break;
       case "round_ended":
-        //close everything when your'e done
-        console.log("Round ended");
         setGameData(lastJsonMessage);
-        setGamePhase('finished');  
+        setGamePhase("finished");  
         setTimerStarted(false);
         setTimeRemaining(null);
+
+        // Update users with new point values
+        if (lastJsonMessage.updatedUsers) {
+          Object.entries(lastJsonMessage.updatedUsers).forEach(([id, userData]) => {
+            if (users[id]) {
+              users[id].totalPoints = userData.totalPoints;
+            }
+          });
+        }
+        return;
+      case "player_disconnected":
+        // Remove disconnected player from status list
+        setPlayerStatuses(prev => {
+          const newStatuses = { ...prev };
+          delete newStatuses[lastJsonMessage.playerId];
+          return newStatuses;
+        });
         break;
-        
+      case "reset_round":
+        setPrompt("");
+        setPromptSubmitted(false);
+        setDrawingSubmitted(false);
+        setSubmittedDrawingData(null);
+        setPlayerStatuses({});
+        setPlayerPoints({});
+        setSelectedPlayers({});
+        setReceivedPrompt(null);
+        setReviewDrawings(null);
+        setGamePhase("waiting");
+        return;
+      case "game_ended":
+        setGamePhase("podium");
+        return;
       default:
         // Ignore if it's anythign else
         break;
@@ -151,21 +203,14 @@ export default function GameRound() {
     console.log("Prompt Submitted:", { prompt, timeLimit });
   };
 
-  //kick everyone if judge left
-  useEffect(() => {
-    if (lastJsonMessage?.type === "judge_disconnected") {
-      // Show alert immediately, then navigate
-      alert("The judge left the game. Returning to home.");
-      navigate("/");
-    }
-  }, [lastJsonMessage]);
+
 
   // Initialize player statuses when prompt is sent
   useEffect(() => {
-    if (isJudge && promptSubmitted && users) {
+    if (receivedPrompt && users) {
       const initialStatuses = {};
       Object.entries(users).forEach(([userId, userData]) => {
-        if (userId !== uuid) { // Don't include the judge
+        if (userId !== judgeUUID) { // Don't include the judge
           initialStatuses[userId] = {
             username: userData.username,
             ready: false,
@@ -175,7 +220,7 @@ export default function GameRound() {
       });
       setPlayerStatuses(initialStatuses);
     }
-  }, [isJudge, promptSubmitted, users, uuid]);
+  }, [receivedPrompt, users, judgeUUID]);
 
   // Countdown timer effect (3-2-1)
   useEffect(() => {
@@ -343,102 +388,290 @@ export default function GameRound() {
 
   // Review screen (shown to everyone - both judge and players)
   if (gamePhase === 'review') {
-    return (
-      <div className="GameRound Review">
-        <div className="Top">
-          <img src={logo} className="Logo"/>
-          <p className="Code">Code: {room || "N/A"}</p>
-        </div>
+  return (
+    <div className="GameRound Review">
+      <div className="Top">
+        <img src={logo} className="Logo"/>
+        <p className="Code">Code: {room || "N/A"}</p>
+      </div>
 
-        <h2>Review Drawings</h2>
-        <p><strong>Prompt:</strong> {reviewDrawings?.prompt}</p>
+      <h2>Review Drawings</h2>
+      <p><strong>Prompt:</strong> {reviewDrawings?.prompt}</p>
 
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
-          gap: '20px',
-          margin: '20px 0'
-        }}>
-          {playerStatuses && Object.entries(playerStatuses).map(([playerId, status]) => {
-            const drawingEntry = reviewDrawings?.drawings?.[playerId];
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
+        gap: '20px',
+        margin: '20px 0'
+      }}>
+        {playerStatuses && Object.entries(playerStatuses).filter(([userId]) => userId !== judgeUUID).map(([playerId, status]) => {
+          const drawingEntry = reviewDrawings?.drawings?.[playerId];
+          const totalPoints = users?.[playerId]?.totalPoints || 0; // Show current total points
 
-            return (
-              <div key={playerId} style={{
-                border: '2px solid #ccc',
-                borderRadius: '8px',
-                padding: '10px',
-                textAlign: 'center',
-                backgroundColor: 'white'
-              }}>
-                <h4>{drawingEntry?.username || status.username || 'Unknown'}</h4>
-                {drawingEntry?.drawingData ? (
-                  <>
-                    <img 
-                      src={drawingEntry.drawingData} 
-                      alt={`${drawingEntry.username}'s drawing`}
-                      style={{ 
-                        maxWidth: '100%', 
-                        height: 'auto',
-                        border: '1px solid #ddd',
-                        borderRadius: '4px'
+          return (
+            <div key={playerId} style={{
+              border: '2px solid #ccc',
+              borderRadius: '8px',
+              padding: '10px',
+              textAlign: 'center',
+              backgroundColor: 'white'
+            }}>
+              <h4>{drawingEntry?.username || status.username || 'Unknown'} - {totalPoints}pts</h4>
+              {drawingEntry?.drawingData ? (
+                <>
+                  <img 
+                    src={drawingEntry.drawingData} 
+                    alt={`${drawingEntry.username}'s drawing`}
+                    style={{ 
+                      maxWidth: '100%', 
+                      height: 'auto',
+                      border: '1px solid #ddd',
+                      borderRadius: '4px'
+                    }}
+                  />
+                </>
+              ) : (
+                //if null canvas submitted, we make our own!
+                <div style={{
+                  aspectRatio: '4 / 3',
+                  border: '1px solid #ddd',
+                  borderRadius: '4px',
+                  backgroundColor: '#ffffff'
+                }}/>
+              )}
+              
+              {/* Judge scoring controls */}
+              {isJudge && (
+                <div style={{ marginTop: '10px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedPlayers[playerId] || false}
+                      onChange={(e) => {
+                        setSelectedPlayers(prev => ({
+                          ...prev,
+                          [playerId]: e.target.checked
+                        }));
+                        if (!e.target.checked) {
+                          setPlayerPoints(prev => {
+                            const newPoints = { ...prev };
+                            delete newPoints[playerId];
+                            return newPoints;
+                          });
+                        }
+                      }}
+                      style={{
+                        width: '1em',
+                        height: '1em',
+                        accentColor: '#000000'
                       }}
                     />
-                  </>
-                ) : (
-                  //MY STROKE OF GEINUS WHICH IS IS ALL ELSE FAILS, FEIGN A BLANK CANVAS
-                  <div style={{
-                    aspectRatio: '4 / 3',
-                    border: '1px solid #ddd',
-                    borderRadius: '4px',
-                    backgroundColor: '#ffffff'
-                  }}/>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Only judge can end the round */}
-        {isJudge && (
-          <div style={{ textAlign: 'center', marginTop: '30px' }}>
-            <button
-              onClick={() => {
-                // You can add scoring/voting logic here
-                sendJsonMessage({
-                  type: "end_round",
-                  results: Object.entries(reviewDrawings.drawings).map(([playerId, data]) => ({
-                    playerId,
-                    username: data.username,
-                    drawing: data.drawingData
-                  }))
-                });
-              }}
-              style={{
-                padding: '15px 30px',
-                fontSize: '18px',
-                backgroundColor: '#28a745',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer'
-              }}
-            >
-              End Round
-            </button>
-          </div>
-        )}
-
-        {/* Players see a message that they're waiting for judge */}
-        {!isJudge && (
-          <div style={{ textAlign: 'center', marginTop: '30px' }}>
-            <p style={{ fontSize: '18px', color: '#666' }}>
-              Waiting for the judge to end the round...
-            </p>
-          </div>
-        )}
+                    Award Points
+                  </label>
+                  
+                  {selectedPlayers[playerId] && (
+                    <input
+                      type="number"
+                      min="0"
+                      max="10"
+                      placeholder="# of Points"
+                      value={playerPoints[playerId] || ''}
+                      onChange={(e) => {
+                        setPlayerPoints(prev => ({
+                          ...prev,
+                          [playerId]: parseInt(e.target.value) || 0
+                        }));
+                      }}
+                      style={{
+                        marginTop: '5px',
+                        padding: '5px',
+                        width: '8em',
+                        textAlign: 'center'
+                      }}
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
+
+      {/* Only judge can end the round */}
+      {isJudge && (
+        <div style={{ textAlign: 'center', marginTop: '30px' }}>
+          <button
+            onClick={() => {
+              sendJsonMessage({
+                type: "end_round",
+                pointsToAward: playerPoints, // Send the points to award
+                results: Object.entries(reviewDrawings.drawings).map(([playerId, data]) => ({
+                  playerId,
+                  username: data.username,
+                  drawing: data.drawingData
+                }))
+              });
+            }}
+            style={{
+              padding: '1vh 2vw',
+              cursor: 'pointer'
+            }}
+          >
+            End Round
+          </button>
+        </div>
+      )}
+
+      {/* Players see a message that they're waiting for judge */}
+      {!isJudge && (
+        <div style={{ textAlign: 'center', marginTop: '30px' }}>
+          <p style={{ fontSize: '18px', color: '#666' }}>
+            Waiting for the judge to end the round...
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+  //scoreboard screen
+  if (gamePhase === 'finished') {
+    return (
+      <>
+      <div className="Top">
+        <img src={logo} className="Logo"/>
+        <p className="Code">Code: {room || "N/A"}</p>
+      </div>
+      <div style={{ textAlign: 'center', marginTop: '2rem' }}>
+      <h3>Scoreboard</h3>
+
+      <div style={{ maxWidth: '75vw', margin: '0 auto', textAlign: 'left' }}>
+        {Object.entries(users).filter(([id]) => id !== judgeUUID)
+          .sort(([, a], [, b]) => (b.totalPoints || 0) - (a.totalPoints || 0))
+          .map(([id, user], index) => (
+            <div key={id} style={{
+              padding: '10px',
+              backgroundColor: '#dedede',
+              marginBottom: '8px',
+              borderRadius: '6px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              fontWeight: uuid === id ? 'bold' : 'normal'
+            }}>
+              <span>{index + 1}. {user.username || '[Empty Player]'}</span>
+              <span>{user.totalPoints || 0} pts</span>
+            </div>
+          ))}
+      </div>
+
+      {isJudge && (
+        <>
+        <div className="Spacer"/>
+        <div style={{ maxWidth: '40vw', display: "flex", justifyContent:"center", marginInline:"auto", gap: '2vw' }}>
+          <button
+           onClick={() => {
+            sendJsonMessage({ type: "reset_round" });
+          }}
+          >
+            Next Round
+          </button>
+
+          <button
+            onClick={() => {
+              sendJsonMessage({ type: "end_game" });
+            }}
+            style={{ backgroundColor: 'black', color: 'white' }}
+          >
+              End Game
+          </button>
+        </div>
+        </>
+      )}
+
+      <p className = "loading" style={{ fontSize: '18px', color: '#666' }}>Waiting for judge</p>
+    </div>
+    </>
     );
   }
+
+  //ending screen
+  if (gamePhase === 'podium') {
+  return (
+    <>
+      <div className="Top">
+        <img src={logo} className="Logo"/>
+        <p className="Code">Code: {room || "N/A"}</p>
+      </div>
+{/* /////////////////////////////// */}
+        <div style={{ marginTop: "3rem", textAlign: "center" }}>
+      <h2> Final Results</h2>
+
+      <div style={{
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "flex-end",
+        gap: "30px",
+        marginTop: "2rem"
+      }}>
+        {[1, 0, 2].map((rankIndex, i) => {
+          const sorted = Object.entries(users)
+            .filter(([id]) => id !== judgeUUID)
+            .sort(([, a], [, b]) => (b.totalPoints || 0) - (a.totalPoints || 0));
+
+          const entry = sorted[rankIndex];
+          if (!entry) return <div key={i} style={{ width: "60vw" }} />;
+
+          const heights = [160, 240, 100]; // 2nd, 1st, 3rd
+          const height = heights[rankIndex];
+
+          return (
+            <div key={entry[0]} style={{ width: "60vw", textAlign: "center" }}>
+              {/* Score + Name box above */}
+              <div style={{
+                backgroundColor: "white",
+                borderRadius: "6px 6px 0 0",
+                padding: "6px 4px",
+                fontSize: "0.9rem",
+                marginBottom: "4px"
+              }}>
+                <div className="RoleLabel">
+                  {entry[1].totalPoints} pts
+                </div>
+                {/* i want it to have a black outline and perfeclty fit*/}
+                <div className="NameBoxPlayer">
+                  {entry[1].username}
+                </div>
+              </div>
+
+              {/* Podium block */}
+              <div style={{
+                backgroundColor: "black",
+                height: `${height}px`,
+                color: "white",
+                fontSize: "2rem",
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "flex-end",
+                paddingBottom: "0.5rem",
+              }}>
+                {rankIndex + 1}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+    {/* /////////////////////////////// */}
+      <div className="Spacer"/>
+      <button onClick={() => navigate('/')}
+          style={{ 
+            padding: '1vh 2vw',
+          }}>
+        Leave
+      </button>
+    </>
+  );
+}
 
   if (isJudge) {
       return (
@@ -490,22 +723,20 @@ export default function GameRound() {
                 <div style={{ fontSize: '1.5rem', margin: '1rem 0' }}>
                   Time Remaining: {formatTime(timeRemaining)}
                 </div>
-              ) : timeRemaining === 0 ? (
-                <div style={{ fontSize: '1.5rem', color: 'red' }}>
-                  Time's Up!
-                </div>
               ) : null}
-              
-              <h3>Player Drawing Status:</h3>
-              <div style={{ margin: '1rem 0' }}>
+              <div style={{ 
+                    display:"flex",
+                    marginInline:"auto",
+                    justifyContent: "center",
+                    alignContent:"center", }}>
                 {Object.entries(playerStatuses).map(([playerId, status]) => (
                   <div key={playerId} style={{ 
+                    width: "80vw",
                     padding: '0.5rem',
                     margin: '0.5rem 0',
-                    backgroundColor: status.ready ? '#d4edda' : '#f8d7da',
-                    borderRadius: '4px'
+                    border: "1px solid #7e7e7e",
                   }}>
-                    <strong>{status.username}</strong>: {status.ready ? `🎨 Drawing Submitted at ${status.submittedAt}` : '✏️ Still Drawing...'}
+                    <strong>{status.username}</strong>: {status.ready ? `Drawing Submitted` : 'Still Drawing...'}
                   </div>
                 ))}
               </div>
@@ -516,14 +747,9 @@ export default function GameRound() {
                   onClick={handleReviewDrawings}
                   disabled={!allPlayersSubmitted}
                   style={{
-                    padding: '10px 20px',
-                    fontSize: '16px',
-                    backgroundColor: allPlayersSubmitted ? '#007bff' : '#6c757d',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
+                    padding: '1vh 2vw',
+                    backgroundColor: allPlayersSubmitted ? "#000000" : "#7e7e7e",
                     cursor: allPlayersSubmitted ? 'pointer' : 'not-allowed',
-                    opacity: allPlayersSubmitted ? 1 : 0.6
                   }}
                 >
                   Review All Drawings
@@ -534,12 +760,6 @@ export default function GameRound() {
                   </p>
                 )}
               </div>
-            </>
-          ) : gamePhase === 'finished' ? (
-            <>
-              <h2>Round Finished!</h2>
-              <p>You can start a new round or end the game.</p>
-              {/* Add logic here to start next round */}
             </>
           ) : (
             <>
@@ -565,7 +785,7 @@ export default function GameRound() {
         ) : gamePhase === 'playing' ? (
           /* Player's drawing interface */
           <div>
-            <h2>Draw: {receivedPrompt?.prompt}</h2>
+            <p>Draw: {receivedPrompt?.prompt}</p>
             
             {!drawingSubmitted ? (
               <>
@@ -578,7 +798,7 @@ export default function GameRound() {
               </>
             ) : (
               <div style={{ textAlign: 'center', marginTop: '2rem' }}>
-                <h3>🎨 Drawing Submitted!</h3>
+                <h3>Drawing Submitted!</h3>
                 {submittedDrawingData && (
                   <div style={{ margin: '20px 0' }}>
                     <p>Your drawing:</p>
@@ -597,11 +817,6 @@ export default function GameRound() {
                 <p>Waiting for other players to finish drawing...</p>
               </div>
             )}
-          </div>
-        ) : gamePhase === 'finished' ? (
-          <div style={{ textAlign: 'center', marginTop: '2rem' }}>
-            <h2>Round Finished!</h2>
-            <p>Waiting for the judge to review drawings...</p>
           </div>
         ) : (
           <p className="loading">Waiting for the judge to send the drawing prompt</p>
