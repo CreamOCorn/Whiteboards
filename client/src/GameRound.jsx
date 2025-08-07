@@ -17,7 +17,6 @@ export default function GameRound() {
   const { username, uuid, room, users } = state || {};
   
   // prompt sending
-  const [gameData, setGameData] = useState(null); //why is this unused
   const [receivedPrompt, setReceivedPrompt] = useState(null); //for the users
   const [promptSubmitted, setPromptSubmitted] = useState(false); //for the judge
   const [timeRemaining, setTimeRemaining] = useState(null); // Timer for players
@@ -128,7 +127,6 @@ export default function GameRound() {
         setTimerStarted(false);
         break;
       case "round_ended":
-        setGameData(lastJsonMessage);
         setGamePhase("finished");  
         setTimerStarted(false);
         setTimeRemaining(null);
@@ -556,9 +554,11 @@ export default function GameRound() {
               borderRadius: '6px',
               display: 'flex',
               justifyContent: 'space-between',
-              fontWeight: uuid === id ? 'bold' : 'normal'
+              fontWeight: uuid === id ? 'bold' : 'normal',
+              overflow: "auto"
             }}>
               <span>{index + 1}. {user.username || '[Empty Player]'}</span>
+              <span style={{paddingLeft: '5vw'}}/>
               <span>{user.totalPoints || 0} pts</span>
             </div>
           ))}
@@ -603,15 +603,14 @@ export default function GameRound() {
         <p className="Code">Code: {room || "N/A"}</p>
       </div>
 {/* /////////////////////////////// */}
-        <div style={{ marginTop: "3rem", textAlign: "center" }}>
+        <div style={{textAlign: "center" }}>
       <h2> Final Results</h2>
 
       <div style={{
         display: "flex",
         justifyContent: "center",
         alignItems: "flex-end",
-        gap: "30px",
-        marginTop: "2rem"
+        gap: "4vw"
       }}>
         {[1, 0, 2].map((rankIndex, i) => {
           const sorted = Object.entries(users)
@@ -621,7 +620,7 @@ export default function GameRound() {
           const entry = sorted[rankIndex];
           if (!entry) return <div key={i} style={{ width: "60vw" }} />;
 
-          const heights = [160, 240, 100]; // 2nd, 1st, 3rd
+          const heights = [300, 225, 150]; // 1st, 2nd, 3rd
           const height = heights[rankIndex];
 
           return (
@@ -629,15 +628,11 @@ export default function GameRound() {
               {/* Score + Name box above */}
               <div style={{
                 backgroundColor: "white",
-                borderRadius: "6px 6px 0 0",
-                padding: "6px 4px",
-                fontSize: "0.9rem",
-                marginBottom: "4px"
+                fontSize: "0.9rem"
               }}>
                 <div className="RoleLabel">
                   {entry[1].totalPoints} pts
                 </div>
-                {/* i want it to have a black outline and perfeclty fit*/}
                 <div className="NameBoxPlayer">
                   {entry[1].username}
                 </div>

@@ -78,11 +78,13 @@
     border-color:rgb(126, 126, 126);
     padding: 15px;
     text-align: center;
-    height: 10vh; 
+    height: 10vh;
+    max-width: 18vw; 
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: smaller;
+    position: relative;
     overflow: auto;
 }
 

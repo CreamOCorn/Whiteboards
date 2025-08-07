@@ -12,7 +12,7 @@ import { WebSocketProvider } from './components/WebSocketContext';
 function App() {
   const [username, setUsername] = useState("")
    const [uuid, setUUID] = useState("");
-  const [role, setRole] = useState('');
+  // const [role, setRole] = useState('');
   const [room, setRoom] = useState('');
   const navigate = useNavigate();
 
@@ -20,10 +20,10 @@ function App() {
 const handleLoginSubmit = async (submissionData) => {
   setUsername(submissionData.username);
   setUUID(submissionData.uuid);
-  setRole(submissionData.type === 'join' ? 'player' : 'judge');
+  // setRole(submissionData.type === 'join' ? 'player' : 'judge');
 
   if (submissionData.type === 'join') {
-      setRole('player');
+      // setRole('player');
       navigate('/join');
   } else if (submissionData.type === 'create') {
     try {
@@ -34,7 +34,7 @@ const handleLoginSubmit = async (submissionData) => {
       const roomCode = data.roomCode;
 
       setRoom(roomCode);       // Save room code to state
-      setRole('judge');        // You are the judge
+      // setRole('judge');        // You are the judge
       navigate('/room');       // Clean URL
     } catch (error) {
       console.error('Error creating room:', error);
@@ -46,7 +46,7 @@ const handleLoginSubmit = async (submissionData) => {
   //when the user clicks "play" on joinroomies, redirect to the correct room
   const handleRoomJoin = (roomCodeFromJoinPage) => {
     setRoom(roomCodeFromJoinPage); // Set room code for joined room
-    setRole('player'); // Ensure role is player for joined room
+    // setRole('player'); // Ensure role is player for joined room
     navigate('/room'); // Navigate after setting state
   };
 
@@ -59,8 +59,8 @@ const handleLoginSubmit = async (submissionData) => {
           
           {/* the paths we can leads down to after submitting our username */}
           <Route path="/join" element={<JoinRoomies username={username} uuid={uuid} onJoin={handleRoomJoin} />} />
-          <Route path="/room" element={<Roomies username={username} uuid={uuid} role={role} room={room} />} />
-          <Route path="/game" element={<GameRound username={username} uuid={uuid} role={role} room={room} />} />
+          <Route path="/room" element={<Roomies username={username} uuid={uuid} room={room} />} />
+          <Route path="/game" element={<GameRound username={username} uuid={uuid} room={room} />} />
         </Routes>
       </WebSocketProvider>
     </div>
