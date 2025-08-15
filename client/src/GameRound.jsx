@@ -9,13 +9,14 @@ import "./Roomies.css";
 
 
 export default function GameRound() {
-  const { state } = useLocation();
+  const { state } = useLocation(); //should parse the queries from the url
   const navigate = useNavigate();
   const { sendJsonMessage, lastJsonMessage, isConnected } = useWebSocketContext();
 
-  // Use state data, not WebSocket data for user info
+  // use state data user info
   const { username, uuid, room, users } = state || {};
   
+  //const [stateValue, functionToSetStateValue] = useState(initialValue) for reference
   // prompt sending
   const [receivedPrompt, setReceivedPrompt] = useState(null); //for the users
   const [promptSubmitted, setPromptSubmitted] = useState(false); //for the judge
@@ -35,18 +36,14 @@ export default function GameRound() {
   const [selectedPlayers, setSelectedPlayers] = useState({}); // Track which players are selected for scoring
   const [playerPoints, setPlayerPoints] = useState({}); // Track points to award
 
-  useEffect(() => {
-    console.log("currentCanvasData updated:", currentCanvasData ? `Length: ${currentCanvasData.length}` : "null");
-  }, [currentCanvasData]);
-
+  //The judge!
   const judgeUUID = users ? Object.keys(users)[0] : null;
   const isJudge = uuid === judgeUUID;
 
-  // Check if all players have submitted
+  // check if all players have submitted
   const allPlayersSubmitted = Object.keys(playerStatuses).length > 0 && Object.values(playerStatuses).every(status => status.ready);
 
-    
-    // Handle disconnection for all users
+    // handle disconnection for all users
     let alertShown = false; //avoid double alerts
     useEffect(() => {
       if (!isConnected && !alertShown) {
@@ -65,7 +62,7 @@ export default function GameRound() {
     }
   }, [lastJsonMessage]);
 
-  // Handle when all players leave
+  // handle when all players leave
   useEffect(() => {
     if (lastJsonMessage?.type === "all_players_left") {
       alert("All players have left the room. Returning home.");
@@ -73,31 +70,32 @@ export default function GameRound() {
     }
   }, [lastJsonMessage]);
 
-  // Listen for game-related messages from the WebSocket
+  // listen for game-related messages from the WebSocket
   useEffect(() => {
     if (!lastJsonMessage || !lastJsonMessage.type) return;
 
-    // Only handle game-specific message types
+    // only handle game-specific message types
     switch (lastJsonMessage.type) {
       case "prompt_sent":
-        // Set the received prompt data first
+        // set the received prompt data first
         const promptData = {
           prompt: lastJsonMessage.prompt,
           timeLimit: lastJsonMessage.timeLimit
         };
         setReceivedPrompt(promptData);
         
-        // Then set game phase to countdown
+        // then set game phase to countdown
         setGamePhase('countdown');
         setCountdownTime(3); // Reset countdown to 3
         console.log("Prompt received:", lastJsonMessage.prompt, "Time limit:", lastJsonMessage.timeLimit);
         break;
       case "countdown_finished":
-        // Start the actual game timer using shared start time
+        // start the actual game timer using shared start time
         setGamePhase('playing');
         
         setReceivedPrompt(prev => ({
           ...prev,
+          //prev is the just prompt
           startTime: lastJsonMessage.startTime, 
           timeLimit: lastJsonMessage.timeLimit,
         }));
@@ -105,11 +103,11 @@ export default function GameRound() {
         setTimerStarted(true);
         break;
       case "player_drawing_submitted":
-        // Update player status for judge
+        // update player status for judge
         console.log("Player drawing submmitted:", lastJsonMessage);
         setPlayerStatuses(prev => {
           const newStatuses = { ...prev };
-          // Make sure we're updating the correct player
+          // make sure we're updating the correct player
           newStatuses[lastJsonMessage.playerId] = {
             ...(newStatuses[lastJsonMessage.playerId] || {}),
             username: lastJsonMessage.username,
@@ -131,7 +129,7 @@ export default function GameRound() {
         setTimerStarted(false);
         setTimeRemaining(null);
 
-        // Update users with new point values
+        // update users with new point values
         if (lastJsonMessage.updatedUsers) {
           Object.entries(lastJsonMessage.updatedUsers).forEach(([id, userData]) => {
             if (users[id]) {
@@ -141,7 +139,7 @@ export default function GameRound() {
         }
         return;
       case "player_disconnected":
-        // Remove disconnected player from status list
+        // remove disconnected player from status list
         setPlayerStatuses(prev => {
           const newStatuses = { ...prev };
           delete newStatuses[lastJsonMessage.playerId];
@@ -164,7 +162,7 @@ export default function GameRound() {
         setGamePhase("podium");
         return;
       default:
-        // Ignore if it's anythign else
+        // ignore if it's anythign else
         break;
     }
   }, [lastJsonMessage]);
@@ -181,7 +179,7 @@ export default function GameRound() {
     return;
     }
 
-    // Send the prompt to all players via WebSocket
+    // send the prompt to all players via WebSocket
     sendJsonMessage({
       type: "send_prompt",
       prompt: prompt.trim(),
@@ -190,7 +188,7 @@ export default function GameRound() {
 
     setPromptSubmitted(true); 
     
-    // For the judge, also set the received prompt data so countdown shows correctly
+    // for the judge, also set the received prompt data so countdown shows correctly
     setReceivedPrompt({
       prompt: prompt.trim(),
       timeLimit: timeLimit
@@ -203,7 +201,7 @@ export default function GameRound() {
 
 
 
-  // Initialize player statuses when prompt is sent
+  // initialize player statuses when prompt is sent
   useEffect(() => {
     if (receivedPrompt && users) {
       const initialStatuses = {};
@@ -220,19 +218,19 @@ export default function GameRound() {
     }
   }, [receivedPrompt, users, judgeUUID]);
 
-  // Countdown timer effect (3-2-1)
+  // countdown timer effect (3-2-1)
   useEffect(() => {
     if (gamePhase !== 'countdown' || countdownTime <= 0) return;
 
     const timer = setTimeout(() => {
       setCountdownTime(prev => {
         if (prev <= 1) {
-          // Countdown finished, start the game
+          // countdown finished, start the game
           setGamePhase('playing');
           setTimeRemaining(receivedPrompt?.timeLimit || 60);
           setTimerStarted(true);
           
-          // Send message to all clients that countdown is finished
+          // send message to all clients that countdown is finished
           sendJsonMessage({
             type: "countdown_finished"
           });
@@ -246,7 +244,7 @@ export default function GameRound() {
     return () => clearTimeout(timer);
   }, [gamePhase, countdownTime, receivedPrompt, sendJsonMessage]);
 
- // Timer countdown during drawing
+ // timer countdown during drawing
   useEffect(() => {
     if (!timerStarted || !receivedPrompt?.startTime || !receivedPrompt?.timeLimit) return;
 
@@ -259,11 +257,12 @@ export default function GameRound() {
         setTimeRemaining(0);
         setTimerStarted(false);
 
-        // Auto-submit drawing if player hasn't submitted yet
+        // auto-submit drawing if player hasn't submitted yet
         if (!drawingSubmitted && !isJudge) {
           console.log("Auto-submitting player:", username);
 
           setTimeout(() => {
+            //looks for the canvas
             let canvas = document.querySelector('canvas') 
               || document.querySelector('.drawing-canvas-container canvas') 
               || document.querySelector('[style*="cursor"]');
@@ -271,6 +270,7 @@ export default function GameRound() {
             console.log("Canvas found:", !!canvas);
 
             if (canvas) {
+              //and then submits whatever tf is there
               canvas.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
               setTimeout(() => {
                 const directCanvasData = canvas.toDataURL('image/png');
@@ -279,7 +279,7 @@ export default function GameRound() {
               }, 50);
             } else {
               console.log("Still no canvas found, falling back to currentCanvasData");
-
+              //THE MANUAL EMPTY CANVAS
               const fallbackData = currentCanvasData || (() => {
                 const tempCanvas = document.createElement('canvas');
                 tempCanvas.width = 800;
@@ -297,7 +297,7 @@ export default function GameRound() {
           console.log("Skipping auto-submit for:", username, "- already submitted or is judge");
         }
 
-        // Judge auto-requests review
+        // judge auto-requests review
         if (isJudge) {
           setTimeout(() => {
             handleReviewDrawings();
@@ -313,18 +313,23 @@ export default function GameRound() {
     return () => clearInterval(interval);
   }, [timerStarted, receivedPrompt?.startTime, receivedPrompt?.timeLimit, drawingSubmitted, isJudge]);
 
+  //Debugging purposes
+  // useEffect(() => {
+  //     console.log("currentCanvasData updated:", currentCanvasData ? `Length: ${currentCanvasData.length}` : "null");
+  //   }, [currentCanvasData]);
 
-  // Handle drawing submission
+  // handle drawing submission
   const handleSubmitDrawing = (drawingData, isAutoSubmit = false) => {
     let finalDrawingData = drawingData;
 
-    // If auto-submitting and no data, use fallback
+    // if auto-submitting and no data, use fallback
     if (isAutoSubmit && !finalDrawingData) {
       console.log("Auto-submit - currentCanvasData:", currentCanvasData ? "exists" : "null");
       finalDrawingData = currentCanvasData;
     }
 
-    // Final fallback: blank canvas
+    // final fallback: blank canvas
+    // I know there's one up there but i'm paranoid... so I have another one
     if (!finalDrawingData) {
       console.log("No drawing data available, creating blank canvas");
       const canvas = document.createElement('canvas');
@@ -350,21 +355,21 @@ export default function GameRound() {
   };
 
 
-  // Format time display (MM:SS)
+  // format time display (MM:SS)
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Judge requests to review all drawings
+  // judge requests to review all drawings
   const handleReviewDrawings = () => {
     sendJsonMessage({
       type: "get_drawings"
     });
   };
 
-  // Countdown screen (shown to everyone)
+  // countdown screen (shown to everyone)
   if (gamePhase === 'countdown') {
     return (
       <div className="GameRound Countdown">
@@ -384,7 +389,7 @@ export default function GameRound() {
     );
   }
 
-  // Review screen (shown to everyone - both judge and players)
+  // review screen (shown to everyone)
   if (gamePhase === 'review') {
   return (
     <div className="GameRound Review">
@@ -393,15 +398,17 @@ export default function GameRound() {
         <p className="Code">Code: {room || "N/A"}</p>
       </div>
 
-      <h2>Review Drawings</h2>
-      <p><strong>Prompt:</strong> {reviewDrawings?.prompt}</p>
-
+      <h2 style={{marginTop: '-8vh'}}>Review Drawings</h2>
+      <p style={{marginTop: '-3vh', marginBottom: '3vh', fontSize: 'smaller'}}><strong style={{fontSize: 'smaller'}}>Prompt:</strong> {reviewDrawings?.prompt}</p>
+      {/* i'm so sorry i'm too lazy to put this in css when i only use it once */}
       <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
-        gap: '20px',
+        display: 'grid',
+        justifyContent: 'center',
+        alignItems: 'center',
+        gridTemplateColumns: '30vw 30vw', 
+        gap: '2vw',
         margin: '20px 0'
-      }}>
+      }}> 
         {playerStatuses && Object.entries(playerStatuses).filter(([userId]) => userId !== judgeUUID).map(([playerId, status]) => {
           const drawingEntry = reviewDrawings?.drawings?.[playerId];
           const totalPoints = users?.[playerId]?.totalPoints || 0; // Show current total points
@@ -410,11 +417,11 @@ export default function GameRound() {
             <div key={playerId} style={{
               border: '2px solid #ccc',
               borderRadius: '8px',
-              padding: '10px',
+              padding: '1vw',
               textAlign: 'center',
               backgroundColor: 'white'
             }}>
-              <h4>{drawingEntry?.username || status.username || 'Unknown'} - {totalPoints}pts</h4>
+              <p style={{marginTop: '0vh', marginBottom: '1vh'}}>{drawingEntry?.username || status.username || 'Unknown'} - {totalPoints}pts</p>
               {drawingEntry?.drawingData ? (
                 <>
                   <img 
@@ -429,7 +436,7 @@ export default function GameRound() {
                   />
                 </>
               ) : (
-                //if null canvas submitted, we make our own!
+                //once again, if null canvas submitted, we make our own!
                 <div style={{
                   aspectRatio: '4 / 3',
                   border: '1px solid #ddd',
@@ -438,7 +445,7 @@ export default function GameRound() {
                 }}/>
               )}
               
-              {/* Judge scoring controls */}
+              {/* judge scoring controls */}
               {isJudge && (
                 <div style={{ marginTop: '10px' }}>
                   <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
@@ -470,8 +477,10 @@ export default function GameRound() {
                   {selectedPlayers[playerId] && (
                     <input
                       type="number"
-                      min="0"
-                      max="10"
+                      step="1"
+                      pattern="[0-9]"
+                      onKeyDown={(e) =>(e.key === "." || e.key === ",") && e.preventDefault()}
+                      onInput={(e) => {e.target.value = Math.abs(e.target.value);}}
                       placeholder="# of Points"
                       value={playerPoints[playerId] || ''}
                       onChange={(e) => {
@@ -495,7 +504,7 @@ export default function GameRound() {
         })}
       </div>
 
-      {/* Only judge can end the round */}
+      {/* only judge can end the round */}
       {isJudge && (
         <div style={{ textAlign: 'center', marginTop: '30px' }}>
           <button
@@ -520,11 +529,11 @@ export default function GameRound() {
         </div>
       )}
 
-      {/* Players see a message that they're waiting for judge */}
+      {/* players see a message that they're waiting for judge */}
       {!isJudge && (
         <div style={{ textAlign: 'center', marginTop: '30px' }}>
-          <p style={{ fontSize: '18px', color: '#666' }}>
-            Waiting for the judge to end the round...
+          <p className = "loading" style={{ marginTop: '0vh',fontSize: '18px', color: '#666' }}>
+            Waiting for the judge to end the round
           </p>
         </div>
       )}
@@ -541,12 +550,12 @@ export default function GameRound() {
         <p className="Code">Code: {room || "N/A"}</p>
       </div>
       <div style={{ textAlign: 'center', marginTop: '2rem' }}>
-      <h3>Scoreboard</h3>
+      <h3 style={{marginTop: '-6vh'}}>Scoreboard</h3>
 
       <div style={{ maxWidth: '75vw', margin: '0 auto', textAlign: 'left' }}>
-        {Object.entries(users).filter(([id]) => id !== judgeUUID)
-          .sort(([, a], [, b]) => (b.totalPoints || 0) - (a.totalPoints || 0))
-          .map(([id, user], index) => (
+        {Object.entries(users).filter(([id]) => id !== judgeUUID) //remove judge
+          .sort(([, a], [, b]) => (b.totalPoints || 0) - (a.totalPoints || 0)) //sort by highest points
+          .map(([id, user], index) => ( //render each user
             <div key={id} style={{
               padding: '10px',
               backgroundColor: '#dedede',
@@ -567,7 +576,7 @@ export default function GameRound() {
       {isJudge && (
         <>
         <div className="Spacer"/>
-        <div style={{ maxWidth: '40vw', display: "flex", justifyContent:"center", marginInline:"auto", gap: '2vw' }}>
+        <div style={{ maxWidth: '40vw', display: "flex", justifyContent:"center", marginInline:"auto", gap: '2vw', marginBottom: '-15vh' }}>
           <button
            onClick={() => {
             sendJsonMessage({ type: "reset_round" });
@@ -602,61 +611,73 @@ export default function GameRound() {
         <img src={logo} className="Logo"/>
         <p className="Code">Code: {room || "N/A"}</p>
       </div>
-{/* /////////////////////////////// */}
-        <div style={{textAlign: "center" }}>
-      <h2> Final Results</h2>
 
-      <div style={{
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "flex-end",
-        gap: "4vw"
-      }}>
-        {[1, 0, 2].map((rankIndex, i) => {
-          const sorted = Object.entries(users)
-            .filter(([id]) => id !== judgeUUID)
-            .sort(([, a], [, b]) => (b.totalPoints || 0) - (a.totalPoints || 0));
+      <div style={{textAlign: "center" }}>
+        <h2 style={{marginTop:'-2vw'}}> Final Results</h2>
 
-          const entry = sorted[rankIndex];
-          if (!entry) return <div key={i} style={{ width: "60vw" }} />;
+        <div style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "flex-end",
+          gap: "4vw"
+        }}>
+          {/* middle is 1, left is 2, right is 3 */}
+          {[1, 0, 2].map((rankIndex, i) => {
+            const sorted = Object.entries(users)
+              .filter(([id]) => id !== judgeUUID)
+              .sort(([, a], [, b]) => (b.totalPoints || 0) - (a.totalPoints || 0));
 
-          const heights = [300, 225, 150]; // 1st, 2nd, 3rd
-          const height = heights[rankIndex];
+            const entry = sorted[rankIndex];
+            if (!entry) return <div key={i} style={{ width: "60vw" }} />;
 
-          return (
-            <div key={entry[0]} style={{ width: "60vw", textAlign: "center" }}>
-              {/* Score + Name box above */}
-              <div style={{
-                backgroundColor: "white",
-                fontSize: "0.9rem"
-              }}>
-                <div className="RoleLabel">
-                  {entry[1].totalPoints} pts
+            const heights = [300, 225, 150]; // 1st, 2nd, 3rd
+            const height = heights[rankIndex];
+
+            return (
+              <div key={entry[0]} style={{ width: "60vw", textAlign: "center" }}>
+                {/* score and name box above */}
+                <div style={{
+                  backgroundColor: "white",
+                  fontSize: "0.9rem"
+                }}>
+                  <div className="RoleLabel">
+                    {entry[1].totalPoints} pts
+                  </div>
+                  <div style={{
+                    border:"1px solid #7E7E7E",
+                    padding: "15px",
+                    textAlign: "center",
+                    height: "10vh",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "smaller",
+                    position: "relative",
+                    overflow: "auto"
+                  }} >
+                    {entry[1].username}
+                  </div>
                 </div>
-                <div className="NameBoxPlayer">
-                  {entry[1].username}
+
+                {/* podium blocks */}
+                <div style={{
+                  backgroundColor: "black",
+                  height: `${height}px`,
+                  color: "white",
+                  fontSize: "2rem",
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "flex-end",
+                  paddingBottom: "0.5rem",
+                }}>
+                  {rankIndex + 1}
                 </div>
               </div>
-
-              {/* Podium block */}
-              <div style={{
-                backgroundColor: "black",
-                height: `${height}px`,
-                color: "white",
-                fontSize: "2rem",
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "flex-end",
-                paddingBottom: "0.5rem",
-              }}>
-                {rankIndex + 1}
-              </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
-    </div>
-    {/* /////////////////////////////// */}
+      
       <div className="Spacer"/>
       <button onClick={() => navigate('/')}
           style={{ 
@@ -676,7 +697,7 @@ export default function GameRound() {
             <p className="Code">Code: {room || "N/A"}</p>
           </div>
 
-          {/* Judge's initial prompt setup */}
+          {/* judge's initial prompt setup */}
           {!promptSubmitted ? (
             <>
               <label>Prompt: </label>
@@ -711,37 +732,43 @@ export default function GameRound() {
               </button>
             </>
           ) : gamePhase === 'playing' ? (
-            /* Judge's view during drawing - showing player statuses */
+            /* judge's view during drawingshowing player statuses */
             <>
-              <h2>Prompt: {prompt}</h2>
+              <h2 style={{marginTop:'-6vh'}}>Prompt: {prompt}</h2>
               {timerStarted && timeRemaining !== null ? (
                 <div style={{ fontSize: '1.5rem', margin: '1rem 0' }}>
                   Time Remaining: {formatTime(timeRemaining)}
                 </div>
               ) : null}
               <div style={{ 
-                    display:"flex",
-                    marginInline:"auto",
+                    marginTop:'-3vh',
+                    display:"grid",
+                    gridTemplateColumns: 'auto auto auto auto',
+                    gap: '1vw',
+                    rowGap:'0',
                     justifyContent: "center",
-                    alignContent:"center", }}>
+                    alignContent:"center"}}>
                 {Object.entries(playerStatuses).map(([playerId, status]) => (
                   <div key={playerId} style={{ 
-                    width: "80vw",
+                    maxWidth: "15vw",
                     padding: '0.5rem',
                     margin: '0.5rem 0',
                     border: "1px solid #7e7e7e",
+                    overflow: 'auto',
+                    fontSize: 'xx-large'
                   }}>
-                    <strong>{status.username}</strong>: {status.ready ? `Drawing Submitted` : 'Still Drawing...'}
+                    <strong>{status.username}</strong>: <br/>{status.ready ? `Drawing Submitted` : 'Still Drawing...'}
                   </div>
                 ))}
               </div>
               
-              {/* Review button - only enabled when all players submitted */}
+              {/* review button enabled when all players submitted */}
               <div style={{ marginTop: '20px' }}>
                 <button
                   onClick={handleReviewDrawings}
                   disabled={!allPlayersSubmitted}
                   style={{
+                    marginTop: '-0.5vh',
                     padding: '1vh 2vw',
                     backgroundColor: allPlayersSubmitted ? "#000000" : "#7e7e7e",
                     cursor: allPlayersSubmitted ? 'pointer' : 'not-allowed',
@@ -750,8 +777,8 @@ export default function GameRound() {
                   Review All Drawings
                 </button>
                 {!allPlayersSubmitted && (
-                  <p style={{ fontSize: '14px', color: '#666', marginTop: '5px' }}>
-                    Waiting for all players to submit their drawings...
+                  <p className="loading" style={{ fontSize: 'small', color: '#666', marginTop: '5px' }}>
+                    Waiting for all players to submit their drawings
                   </p>
                 )}
               </div>
@@ -767,7 +794,7 @@ export default function GameRound() {
       );
     }
 
-    // Player view
+    // player view
     return (
       <div className="GameRound Player">
         <div className="Top">
@@ -778,9 +805,9 @@ export default function GameRound() {
         {!isConnected ? (
           <p className="loading">Game Not Found</p>
         ) : gamePhase === 'playing' ? (
-          /* Player's drawing interface */
+          /* player's drawing interface */
           <div>
-            <p>Draw: {receivedPrompt?.prompt}</p>
+            <p style={{marginTop: '-8vh', marginBottom: '2vh'}}>Draw: {receivedPrompt?.prompt}</p>
             
             {!drawingSubmitted ? (
               <>
@@ -792,16 +819,15 @@ export default function GameRound() {
                 />
               </>
             ) : (
-              <div style={{ textAlign: 'center', marginTop: '2rem' }}>
-                <h3>Drawing Submitted!</h3>
+              <div style={{ textAlign: 'center'}}>
+                <h3>Drawing Submitted</h3>
                 {submittedDrawingData && (
-                  <div style={{ margin: '20px 0' }}>
-                    <p>Your drawing:</p>
+                  <div>
                     <img 
                       src={submittedDrawingData} 
                       alt="Your submitted drawing"
                       style={{ 
-                        maxWidth: '400px',
+                        maxWidth: '600px',
                         height: 'auto',
                         border: '2px solid #ccc',
                         borderRadius: '8px'
@@ -809,7 +835,7 @@ export default function GameRound() {
                     />
                   </div>
                 )}
-                <p>Waiting for other players to finish drawing...</p>
+                <p className="loading" style={{fontSize:'xx-large', marginTop: '3vh'}}>Waiting for other players to finish drawing</p>
               </div>
             )}
           </div>

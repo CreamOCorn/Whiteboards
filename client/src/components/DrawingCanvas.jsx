@@ -1,32 +1,39 @@
 import React, { useRef, useEffect, useState } from 'react';
-
+import "./Login.css";
 const DrawingCanvas = ({ onDrawingSubmit, onCanvasChange, disabled, timeRemaining }) => {
-  const canvasRef = useRef(null);
+  // onDrawingSubmit: prompted when user clicks submit button
+  //onCanvasChange: prompted with each brushstroke
+  // disabled: boolean to disable all drawing interactions
+  //timeRemaining: # of seconds remaining (for timer display)
+  const canvasRef = useRef(null); //this object holds the canvas!
 
+  //all the "settings"
   const [isDrawing, setIsDrawing] = useState(false);
   const [brushSize, setBrushSize] = useState(5);
   const [brushColor, setBrushColor] = useState('#000000');
   const [tool, setTool] = useState('brush');
 
-  const [strokes, setStrokes] = useState([]);      // Full drawing history
-  const [redoStack, setRedoStack] = useState([]);  // Redo buffer
-  const [currentStroke, setCurrentStroke] = useState(null); // Current stroke in progress
-  const [lastPoint, setLastPoint] = useState(null); // Track last drawn point
+  //all the canvas "brushstrokes"
+  const [strokes, setStrokes] = useState([]);      // every stroke made
+  const [redoStack, setRedoStack] = useState([]);  // every stroke undone
+  const [currentStroke, setCurrentStroke] = useState(null); // current stroke
+  const [lastPoint, setLastPoint] = useState(null); // last mouse position tracking
 
-  // Helper function to update parent with current canvas
+  // helper function to update parent with current canvas
   const updateParentCanvas = () => {
     if (onCanvasChange && canvasRef.current) {
       try {
-        const dataURL = canvasRef.current.toDataURL('image/png');
-        console.log("UpdateParentCanvas called, data length:", dataURL.length);
+        //updates the png as the user draws so autosubmit can take the most recent one
+        const dataURL = canvasRef.current.toDataURL('image/png'); 
+        console.log("UpdateParentCanvas called, data length:", dataURL.length); //debugging dw
         onCanvasChange(dataURL);
       } catch (error) {
         console.error("Error updating parent canvas:", error);
-        // Fallback - create a blank canvas data URL
-        const tempCanvas = document.createElement('canvas');
+        // blank canvas if all else fails
+        const tempCanvas = document.createElement('canvas'); //isnt it amazing there is literally a canvas element
         tempCanvas.width = 800;
         tempCanvas.height = 600;
-        const ctx = tempCanvas.getContext('2d');
+        const ctx = tempCanvas.getContext('2d'); 
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
         onCanvasChange(tempCanvas.toDataURL('image/png'));
@@ -34,79 +41,86 @@ const DrawingCanvas = ({ onDrawingSubmit, onCanvasChange, disabled, timeRemainin
     }
   };
 
-  // Setup canvas on mount
+  // setup canvas on mount
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     
+    //blank canvas
     canvas.width = 800;
     canvas.height = 600;
-
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    // Send initial blank canvas to parent - use setTimeout to ensure it's called
+    // send initial blank canvas to parent (using setTimeout to give some buffer time)
     setTimeout(() => {
       updateParentCanvas();
     }, 100);
   }, []);
 
-  // Also update parent whenever the component re-renders (backup safety)
+  // always update parent whenever the component re-renders (aka at every modification)
   useEffect(() => {
     if (canvasRef.current) {
       updateParentCanvas();
     }
   });
 
-  // Get mouse/touch coordinates relative to canvas
+  // get mouse coordinates relative to canvas
   const getCursor = (e) => {
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
     return {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
+      x: e.clientX - rect.left, //screen X minus canvas left edge
+      y: e.clientY - rect.top, //screen Y minus canvas top edge
     };
   };
 
-  // Start new stroke
+  // initial stroke - HANDLES THE INITIAL TAP OF THE BEGINNING STROKE aka shows us the "dot" if we tap
   const startDrawing = (e) => {
-    if (disabled) return;
+    if (disabled) return; //can't draw if time's up
+
     setIsDrawing(true);
-    const pos = getCursor(e);
+
+    //grabbing positions
+    const pos = getCursor(e); 
     setLastPoint(pos);
     
     const newStroke = {
       tool,
       color: brushColor,
       size: brushSize,
-      path: [pos],
+      path: [pos], //adding our "beginning dot" to the path
     };
     setCurrentStroke(newStroke);
     
-    // Draw the initial point
+    // draw it on the canvas
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     
     ctx.beginPath();
-    ctx.lineJoin = 'round';
+    ctx.lineJoin = 'round'; //connect the points
     ctx.lineCap = 'round';
     
     if (tool === 'eraser') {
-      ctx.globalCompositeOperation = 'destination-out';
-      ctx.lineWidth = brushSize * 2;
+      ctx.globalCompositeOperation = 'destination-out'; //so apparently this is how you erase
+      ctx.lineWidth = brushSize * 2; //slightly bigger than brush
     } else {
-      ctx.globalCompositeOperation = 'source-over';
+      //if not eraser then you are drawing
+      ctx.globalCompositeOperation = 'source-over'; //lets you draw "over" anything on the current canvas
       ctx.strokeStyle = brushColor;
       ctx.lineWidth = brushSize;
     }
     
-    ctx.arc(pos.x, pos.y, brushSize / 2, 0, 2 * Math.PI);
+    //lets us see the "brush" as a circle for the first point 
+    //(position being middle of the circle, brush size/2 being radius, 0 being staring angle, 2*pi being ending angle (360 degrees))
+    //this makes a full circle
+    ctx.arc(pos.x, pos.y, brushSize / 2, 0, 2 * Math.PI); 
     ctx.fill();
     ctx.globalCompositeOperation = 'source-over';
   };
 
-  // Continue stroke - draw incrementally
+  // continue stroke - HANDLES FOR IF YOU DO MORE THAN JUST TAP AKA "stroke"
   const draw = (e) => {
     if (!isDrawing || disabled) return;
     const pos = getCursor(e);
@@ -116,8 +130,8 @@ const DrawingCanvas = ({ onDrawingSubmit, onCanvasChange, disabled, timeRemainin
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     
-    // Draw line from last point to current point
-    ctx.beginPath();
+    // draw line from last point to current point
+    ctx.beginPath(); //resets the drawing context so each stroke is different
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
     
@@ -130,58 +144,61 @@ const DrawingCanvas = ({ onDrawingSubmit, onCanvasChange, disabled, timeRemainin
       ctx.lineWidth = currentStroke.size;
     }
     
-    ctx.moveTo(lastPoint.x, lastPoint.y);
-    ctx.lineTo(pos.x, pos.y);
-    ctx.stroke();
-    ctx.closePath();
-    ctx.globalCompositeOperation = 'source-over';
+    //"map out the stroke"
+    ctx.moveTo(lastPoint.x, lastPoint.y); //move the "pen" to the last point
+    ctx.lineTo(pos.x, pos.y); //define a line to our current mouse
+
+    ctx.stroke(); //actually draws it. basically the line follows your mouse and here it updates the line
+    ctx.closePath(); //close when you lift up mouse
+    ctx.globalCompositeOperation = 'source-over'; //reset so you can "draw over" with your next stroke
     
-    // Update current stroke and last point
+    // update current stroke and last point
     setCurrentStroke((prev) => {
       if (!prev) return null;
-      return { ...prev, path: [...prev.path, pos] };
+      return { ...prev, path: [...prev.path, pos] }; //path now added our most recent point alongside old ones to update stroke
     });
-    setLastPoint(pos);
+    setLastPoint(pos); //update last point for next line segment
   };
 
-  // End stroke
+  // end of stroke - on mouseup!
   const stopDrawing = () => {
     if (!isDrawing) return;
     setIsDrawing(false);
     setLastPoint(null);
     
     if (currentStroke) {
-      const newStrokes = [...strokes, currentStroke];
+      const newStrokes = [...strokes, currentStroke]; //add completed stroke to history
       setStrokes(newStrokes);
-      setRedoStack([]); // Clear redo on new action
+      setRedoStack([]); // clear redo stack since you have begun drawing again
       setCurrentStroke(null);
       
-      // Update parent with final canvas state
+      // update parent with final canvas state
       setTimeout(updateParentCanvas, 50);
     }
   };
 
-  // Redraw everything (for undo/redo/clear operations)
+  // redrawing mechanism for undo/redo/clear 
   const redrawCanvas = (allStrokes) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     
     const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // White background
+    //clear everything and remake a blank canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+    //redraw all the strokes in order
     for (const stroke of allStrokes) {
       drawStroke(ctx, stroke);
     }
     
-    // Update parent with current canvas data
+    // update parent with current canvas data
     setTimeout(updateParentCanvas, 10);
   };
 
-  // Draw a single stroke
+  // redrawCanvas helper method to draw a single stroke
   const drawStroke = (ctx, stroke) => {
     if (!stroke.path || stroke.path.length < 1) return;
 
@@ -199,11 +216,11 @@ const DrawingCanvas = ({ onDrawingSubmit, onCanvasChange, disabled, timeRemainin
     }
 
     if (stroke.path.length === 1) {
-      // Single point - draw a circle
+      // Ssngle point draws a circle
       ctx.arc(stroke.path[0].x, stroke.path[0].y, stroke.size / 2, 0, 2 * Math.PI);
       ctx.fill();
     } else {
-      // Multiple points - draw lines
+      // multiple points draws lines
       ctx.moveTo(stroke.path[0].x, stroke.path[0].y);
       for (let i = 1; i < stroke.path.length; i++) {
         ctx.lineTo(stroke.path[i].x, stroke.path[i].y);
@@ -212,35 +229,38 @@ const DrawingCanvas = ({ onDrawingSubmit, onCanvasChange, disabled, timeRemainin
     }
     
     ctx.closePath();
-    ctx.globalCompositeOperation = 'source-over'; // Reset after stroke
+    ctx.globalCompositeOperation = 'source-over'; //reset after stroke
   };
 
-  // Undo last stroke
+  // undo last stroke
   const handleUndo = () => {
-    if (strokes.length === 0) return;
+    if (strokes.length === 0) return; //no previous strokes
     const newStrokes = [...strokes];
-    const last = newStrokes.pop();
+    const last = newStrokes.pop(); //delete the last stroke that was made
     setStrokes(newStrokes);
-    setRedoStack((prev) => [last, ...prev]);
-    redrawCanvas(newStrokes);
+    setRedoStack((prev) => [last, ...prev]); //put that stroke in the redo stack
+    redrawCanvas(newStrokes); //and then redraw the whole canvas
   };
 
-  // Redo last undone stroke
+  // redo last undone stroke
   const handleRedo = () => {
-    if (redoStack.length === 0) return;
-    const [restored, ...rest] = redoStack;
+    if (redoStack.length === 0) return; //no previous undos
+    //takes the first stroke from redoStack and assigns it to restoredStroke
+    //then puts the restored stroke into our list of current strokes
+    const [restored, ...rest] = redoStack; 
     const newStrokes = [...strokes, restored];
     setStrokes(newStrokes);
     setRedoStack(rest);
     redrawCanvas(newStrokes);
   };
 
-  // Clear entire canvas
+  // clear entire canvas
   const clearCanvas = () => {
     if (disabled) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     
+    //once again the white canvas strikes
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = '#ffffff';
@@ -248,21 +268,21 @@ const DrawingCanvas = ({ onDrawingSubmit, onCanvasChange, disabled, timeRemainin
     setStrokes([]);
     setRedoStack([]);
     
-    // Update parent with cleared canvas
+    // update parent with cleared canvas
     setTimeout(updateParentCanvas, 10);
   };
 
-  // Submit final image to parent
+  //submit final image to parent
   const submitDrawing = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     
     try {
-      const data = canvas.toDataURL('image/png');
+      const data = canvas.toDataURL('image/png'); //final png
       onDrawingSubmit(data);
     } catch (error) {
       console.error("Error submitting drawing:", error);
-      // Create fallback blank canvas
+      // create fallback blank canvas there's so many of these
       const tempCanvas = document.createElement('canvas');
       tempCanvas.width = 800;
       tempCanvas.height = 600;
@@ -273,31 +293,34 @@ const DrawingCanvas = ({ onDrawingSubmit, onCanvasChange, disabled, timeRemainin
     }
   };
 
-  // Touch handlers
+  // touch handlers
+  //upon mousedown start stroke
   const handleTouchStart = (e) => {
     e.preventDefault();
-    const touch = e.touches[0];
+    const touch = e.touches[0]; //first touch point in case.. mobile users 
     startDrawing({ clientX: touch.clientX, clientY: touch.clientY });
   };
-
+  //upon mouse drag continue stroke
   const handleTouchMove = (e) => {
     e.preventDefault();
     const touch = e.touches[0];
     draw({ clientX: touch.clientX, clientY: touch.clientY });
   };
-
+  //upon mouseup stop stroke
   const handleTouchEnd = (e) => {
     e.preventDefault();
     stopDrawing();
   };
 
-  // Keyboard shortcuts
+  // keyboard shortcuts
   useEffect(() => {
     const keyHandler = (e) => {
       if (disabled) return;
+      //ctrlz is undo
       if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
         e.preventDefault();
         handleUndo();
+      //ctrly is redo
       } else if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
         e.preventDefault();
         handleRedo();
@@ -308,57 +331,118 @@ const DrawingCanvas = ({ onDrawingSubmit, onCanvasChange, disabled, timeRemainin
   }, [strokes, redoStack, disabled]);
 
   return (
-    <div className="drawing-canvas-container" style={{ textAlign: 'center' }}>
-      {/* Toolbar */}
-      <div style={{ marginBottom: '10px', padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '5px', display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '15px' }}>
-        <div>
-          <label style={{ marginRight: '5px' }}>Tool:</label>
-          <select value={tool} onChange={(e) => setTool(e.target.value)} disabled={disabled}>
-            <option value="brush">Brush</option>
-            <option value="eraser">Eraser</option>
-          </select>
-        </div>
-
-        {tool === 'brush' && (
-          <div>
-            <label style={{ marginRight: '5px' }}>Color:</label>
-            <input type="color" value={brushColor} onChange={(e) => setBrushColor(e.target.value)} disabled={disabled} />
-          </div>
-        )}
-
-        <div>
-          <label style={{ marginRight: '5px' }}>Size: {brushSize}px</label>
-          <input type="range" min="1" max="50" value={brushSize} onChange={(e) => setBrushSize(parseInt(e.target.value))} disabled={disabled} />
-        </div>
-
-        <button onClick={clearCanvas} disabled={disabled}>Clear</button>
-        <button onClick={handleUndo} disabled={disabled || strokes.length === 0}>Undo</button>
-        <button onClick={handleRedo} disabled={disabled || redoStack.length === 0}>Redo</button>
+<div className="drawing-canvas-container" style={{ textAlign: 'center' }}>
+  {/* Main container with canvas and side toolbars */}
+  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'stretch', gap: '20px', marginTop: '-1vh'}}>
+    
+    {/* Left toolbar - Drawing tools */}
+    <div style={{ 
+      display: 'flex', 
+      flexDirection: 'column', 
+      gap: '3vh', 
+      padding: '1vw', 
+      paddingTop:'8vh',
+      backgroundColor: '#f5f5f5', 
+      width: '10vw'
+    }}>
+      <div>
+        <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Tool:</label>
+        <select value={tool} onChange={(e) => setTool(e.target.value)} disabled={disabled} style={{ width: '100%' }}>
+          <option value="brush">Marker</option>
+          <option value="eraser">Eraser</option>
+        </select>
       </div>
 
-      {/* Canvas */}
-      <div style={{ border: '2px solid #ccc', borderRadius: '5px', display: 'inline-block' }}>
-        <canvas
-          ref={canvasRef}
-          onMouseDown={startDrawing}
-          onMouseMove={draw}
-          onMouseUp={stopDrawing}
-          onMouseLeave={stopDrawing}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-          style={{ cursor: disabled ? 'not-allowed' : 'crosshair', display: 'block' }}
+      {tool === 'brush' && (
+        <div>
+          <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Color:</label>
+          <input 
+            type="color" 
+            value={brushColor} 
+            onChange={(e) => setBrushColor(e.target.value)} 
+            disabled={disabled} 
+            style={{ width: '100%', height: '40px' }}
+          />
+        </div>
+      )}
+
+      <div>
+        <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
+          Size: {brushSize}px
+        </label>
+        <input 
+          type="range"
+          className="fuckinslider" 
+          min="1" 
+          max="100" 
+          value={brushSize} 
+          onChange={(e) => setBrushSize(parseInt(e.target.value))} 
+          disabled={disabled}
+          style={{ width: '100%' }}
         />
       </div>
+    </div>
 
-      {/* Submit + Timer */}
-      <div style={{ marginTop: '15px' }}>
+    {/* Canvas in the center */}
+    <div style={{ border: '2px solid #ccc', display: 'inline-block'}}>
+      <canvas
+        ref={canvasRef}
+        width={800}
+        height={600}
+        onMouseDown={startDrawing}
+        onMouseMove={draw}
+        onMouseUp={stopDrawing}
+        onMouseLeave={stopDrawing}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        style={{ cursor: disabled ? 'not-allowed' : 'crosshair', display: 'block' }}
+      />
+    </div>
+
+    {/* Right toolbar - Action buttons */}
+    <div style={{ 
+      display: 'flex', 
+      flexDirection: 'column', 
+      gap: '8vh', 
+      padding: '15px', 
+      paddingTop: '10vh',
+      paddingBottom: '10vh',
+      backgroundColor: '#f5f5f5', 
+      width: '10vw'
+    }}>
+      <button 
+        onClick={clearCanvas} 
+        disabled={disabled}
+      >
+        Clear
+      </button>
+      
+      <button 
+        onClick={handleUndo} 
+        disabled={disabled || strokes.length === 0}
+      >
+        Undo
+      </button>
+      
+      <button 
+        onClick={handleRedo} 
+        disabled={disabled || redoStack.length === 0}
+      >
+        Redo
+      </button>
+    </div>
+  </div>
+
+
+      {/* submit / timer */}
+      <div style={{ marginTop: '0.5vh'  }}>
         <button onClick={submitDrawing} disabled={disabled}>
           Submit
         </button>
 
         {timeRemaining !== null && (
-          <div style={{ marginTop: '10px', color: timeRemaining <= 10 ? 'red' : 'black' }}>
+          <div style={{ marginTop: '1vh', color: timeRemaining <= 10 ? 'red' : 'black', fontSize: 'xx-large' }}>
             Time remaining: {Math.floor(timeRemaining / 60)}:{(timeRemaining % 60).toString().padStart(2, '0')}
           </div>
         )}

@@ -62,3 +62,7 @@ button {
 button:hover {
   cursor: pointer;
 }
+
+.fuckinslider {
+  accent-color: black;
+}

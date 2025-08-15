@@ -5,7 +5,7 @@ const url = require('url')
 const uuidv4 = require("uuid").v4 // method that generates random id's
 require('dotenv').config()
 
-const port = 8000 // just a port to pass info
+const port = 8000 // "commonly used for web servers and HTTP-based applications"
 
 const rooms = {}; // hold all rooms and their users/connections
 
@@ -345,6 +345,17 @@ connection.on("close", () => {
 
   const remainingUUIDs = Object.keys(rooms[room].users);
 
+  //tell frontend the new userlist
+  const dcMessage = JSON.stringify({
+    type: "player_disconnected",
+    users: remainingUUIDs
+  });
+  Object.values(rooms[room].connections).forEach(conn => {
+    if (conn.readyState === conn.OPEN) {
+      conn.send(dcMessage);
+    }
+  });
+
   // If no users left at all, delete room and stop
   if (remainingUUIDs.length === 0) {
     delete rooms[room];
@@ -356,7 +367,7 @@ connection.on("close", () => {
   if (rooms[room].gameStarted) {
     delete rooms[room].drawings[uuid];
     
-      // --- JUDGE LEFT DURING GAME: End game for everyone ---
+      //JUDGE LEFT DURING GAME: End game for everyone
     if (isJudge) {
       console.log("Judge disconnected during game. Kicking all.");
       const kickMessage = JSON.stringify({
@@ -374,22 +385,25 @@ connection.on("close", () => {
       delete rooms[room];
       console.log(`Room ${room} deleted because empty`);
       return;
-    }
-      // --- ALL NON-JUDGE PLAYERS LEFT DURING GAME: Kick judge ---
-    const nonJudgeUsers = remainingUUIDs.filter(id => id !== rooms[room].judgeUUID);
-    if (nonJudgeUsers.length === 0 && rooms[room].gameStarted) {
-      console.log("All players left. Closing judge.");
+    } else {
+      //ALL NON-JUDGE PLAYERS LEFT DURING GAME: Kick judge
+      if (remainingUUIDs.length === 1) { //onlyt he judge is left
+        console.log("All players left. Closing judge.");
 
-      const judgeConn = rooms[room].connections[rooms[room].judgeUUID];
-      if (judgeConn && judgeConn.readyState === judgeConn.OPEN) {
-        judgeConn.send(JSON.stringify({ type: "all_players_left" }));
-        judgeConn.close();
+        //delete everyone (aka the one person judge) in the room
+        Object.values(rooms[room].connections).forEach(conn => {
+          if (conn.readyState === conn.OPEN) {
+            conn.send(JSON.stringify({ type: "all_players_left" }));
+            conn.close();
+          }
+        });
+
+        delete rooms[room];
+        console.log(`Room ${room} deleted because empty`);
+        return;
       }
-
-      delete rooms[room];
-      console.log(`Room ${room} deleted because empty`);
-      return;
     }
+      
   }
   //update player list
   broadcastRoom();

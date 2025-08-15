@@ -1,12 +1,14 @@
 // WebSocketContext.jsx
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 
+//HERE IT IS, THE EVERYTHING THAT MAKES EVERYTHING WORK
+//I'm ngl to u I still don't really know what this does or why it's able to pass data but I'll take it
 const WebSocketContext = createContext();
 
 export const useWebSocketContext = () => {
   const context = useContext(WebSocketContext);
   if (!context) {
-    throw new Error('useWebSocketContext must be used within a WebSocketProvider');
+    throw new Error('useWebSocketContext must be used within a WebSocketProvider'); //Hopefully I never see this because it's in the App.jsx rn but in case!
   }
   return context;
 };
@@ -15,14 +17,16 @@ export const WebSocketProvider = ({ children }) => {
   const [connectionParams, setConnectionParams] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const [lastJsonMessage, setLastJsonMessage] = useState(null);
-  const wsRef = useRef(null);
+  const wsRef = useRef(null); //Just stores our current url's conenction as an object
   const reconnectTimeoutRef = useRef(null);
+
 
   const connect = (username, uuid, room) => {
     console.log('Connecting to WebSocket with:', { username, uuid, room });
-    setConnectionParams({ username, uuid, room });
+    setConnectionParams({ username, uuid, room }); //This is the state that the Roomies page will recieve
   };
 
+  
   const disconnect = () => {
     console.log('Disconnecting from WebSocket');
     if (wsRef.current) {
@@ -45,7 +49,9 @@ export const WebSocketProvider = ({ children }) => {
     if (!connectionParams) return;
 
     const { username, uuid, room } = connectionParams;
-    const wsUrl = `ws://127.0.0.1:8000?username=${encodeURIComponent(username)}&uuid=${uuid}&room=${room}`;
+
+    
+    const wsUrl = `${import.meta.env.VITE_WS_URL}?username=${encodeURIComponent(username)}&uuid=${uuid}&room=${room}`;
     
     console.log('Creating WebSocket connection to:', wsUrl);
     

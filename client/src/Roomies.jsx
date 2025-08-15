@@ -123,14 +123,14 @@ export function Roomies ({ username, uuid, room }) {
 
   const myUUID = uuid; // For local comparison
 
-  // Connect to WebSocket when component mounts (only once)
+  // Connect to WebSocket when component mounts 
   useEffect(() => {
     if (username && uuid && room && !hasNavigated && !hasConnected.current) {
       console.log('Connecting to WebSocket...');
       connect(username, uuid, room);
       hasConnected.current = true;
     }
-  }, [username, uuid, room, hasNavigated]); // Remove 'connect' from dependencies
+  }, [username, uuid, room, hasNavigated]); 
 
   //Sends to the json that user connected and loads the page
   useEffect(() => {

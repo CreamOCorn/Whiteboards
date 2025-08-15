@@ -12,29 +12,25 @@ import { WebSocketProvider } from './components/WebSocketContext';
 function App() {
   const [username, setUsername] = useState("")
    const [uuid, setUUID] = useState("");
-  // const [role, setRole] = useState('');
-  const [room, setRoom] = useState('');
+  const [room, setRoom] = useState("");
   const navigate = useNavigate();
 
   //when we submit our data on the login page, then it will append either "player or judge"
 const handleLoginSubmit = async (submissionData) => {
   setUsername(submissionData.username);
   setUUID(submissionData.uuid);
-  // setRole(submissionData.type === 'join' ? 'player' : 'judge');
 
   if (submissionData.type === 'join') {
-      // setRole('player');
       navigate('/join');
   } else if (submissionData.type === 'create') {
-    try {
-      const response = await fetch('http://localhost:8000/create-room', { method: 'POST' });
+    try {               
+      const response = await fetch('http://localhost:8000/create-room', { method: 'POST' }); //Next time i will remember not to hardcode this port
       if (!response.ok) throw new Error('Failed to create room');
 
       const data = await response.json();
       const roomCode = data.roomCode;
 
       setRoom(roomCode);       // Save room code to state
-      // setRole('judge');        // You are the judge
       navigate('/room');       // Clean URL
     } catch (error) {
       console.error('Error creating room:', error);
@@ -46,7 +42,6 @@ const handleLoginSubmit = async (submissionData) => {
   //when the user clicks "play" on joinroomies, redirect to the correct room
   const handleRoomJoin = (roomCodeFromJoinPage) => {
     setRoom(roomCodeFromJoinPage); // Set room code for joined room
-    // setRole('player'); // Ensure role is player for joined room
     navigate('/room'); // Navigate after setting state
   };
 
