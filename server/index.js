@@ -43,6 +43,7 @@ const server = http.createServer((req, res) => {
      rooms[roomCode] = {
       users: {},
       connections: {},
+      playerStatuses: {}, //submission
       gameStarted: false,
       currentPrompt: null, // Store current prompt
       drawings: {} // Store drawings temporarily
@@ -223,10 +224,28 @@ wsServer.on("connection", (connection, request) => {
         rooms[room].timeLimit = timeLimit;
         rooms[room].countdownStarted = false; // reset
 
+        // initialize playerStatuses as well
+        const initialStatuses = {};
+        const judgeUUID = Object.keys(rooms[room].users)[0];
+
+        Object.entries(rooms[room].users).forEach(([userId, userData]) => {
+          if (userId !== judgeUUID) { 
+            initialStatuses[userId] = {
+              username: userData.username,
+              ready: false,
+              submittedAt: null
+            };
+          }
+        });
+
+        // store the new statuses in the room state.
+        rooms[room].playerStatuses = initialStatuses;
+
         const message = JSON.stringify({
           type: "prompt_sent",
           prompt,
-          timeLimit
+          timeLimit,
+          playerStatuses: rooms[room].playerStatuses
         });
 
         Object.values(rooms[room].connections).forEach(conn => {
@@ -251,13 +270,20 @@ wsServer.on("connection", (connection, request) => {
           drawingId: null // No longer using MongoDB ID
         };
 
+        //show that player has now submitted
+        rooms[room].playerStatuses[uuid] = {
+          username: user.username,
+          ready: true,
+          submittedAt: new Date().toLocaleTimeString()
+        };
         // Broadcast to all clients (especially judge) that this player submitted
         const drawingSubmittedPayload = JSON.stringify({
           type: "player_drawing_submitted",
           playerId: uuid,
           username: user.username,
           submittedAt: new Date().toLocaleTimeString(),
-          isAutoSubmit: parsedMsg.isAutoSubmit || false
+          isAutoSubmit: parsedMsg.isAutoSubmit || false,
+          playerStatuses: rooms[room].playerStatuses //send the full lsit of players with their statuses
         });
 
         Object.values(rooms[room].connections).forEach(conn => {
@@ -342,13 +368,16 @@ connection.on("close", () => {
   // Remove user before broadcasting
   delete rooms[room].users[uuid];
   delete rooms[room].connections[uuid];
+  delete rooms[room].playerStatuses[uuid];
 
   const remainingUUIDs = Object.keys(rooms[room].users);
 
   //tell frontend the new userlist
   const dcMessage = JSON.stringify({
     type: "player_disconnected",
-    users: remainingUUIDs
+    playerId: uuid,
+    users: rooms[room].users,
+    playerStatuses: rooms[room].playerStatuses
   });
   Object.values(rooms[room].connections).forEach(conn => {
     if (conn.readyState === conn.OPEN) {

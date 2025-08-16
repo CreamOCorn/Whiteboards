@@ -14,7 +14,8 @@ export default function GameRound() {
   const { sendJsonMessage, lastJsonMessage, isConnected } = useWebSocketContext();
 
   // use state data user info
-  const { username, uuid, room, users } = state || {};
+  const { username, uuid, room } = state || {};
+  const [users, setUsers] = useState(state?.users || {});
   
   //const [stateValue, functionToSetStateValue] = useState(initialValue) for reference
   // prompt sending
@@ -83,7 +84,8 @@ export default function GameRound() {
           timeLimit: lastJsonMessage.timeLimit
         };
         setReceivedPrompt(promptData);
-        
+        setPlayerStatuses(lastJsonMessage.playerStatuses);
+
         // then set game phase to countdown
         setGamePhase('countdown');
         setCountdownTime(3); // Reset countdown to 3
@@ -105,18 +107,7 @@ export default function GameRound() {
       case "player_drawing_submitted":
         // update player status for judge
         console.log("Player drawing submmitted:", lastJsonMessage);
-        setPlayerStatuses(prev => {
-          const newStatuses = { ...prev };
-          // make sure we're updating the correct player
-          newStatuses[lastJsonMessage.playerId] = {
-            ...(newStatuses[lastJsonMessage.playerId] || {}),
-            username: lastJsonMessage.username,
-            ready: true,
-            submittedAt: lastJsonMessage.submittedAt
-          };
-          console.log("Updated player statuses:", newStatuses);
-          return newStatuses;
-        });
+        setPlayerStatuses(lastJsonMessage.playerStatuses);
         break;
       case "drawings_for_review":
         // choose which drawings win
@@ -130,21 +121,15 @@ export default function GameRound() {
         setTimeRemaining(null);
 
         // update users with new point values
-        if (lastJsonMessage.updatedUsers) {
-          Object.entries(lastJsonMessage.updatedUsers).forEach(([id, userData]) => {
-            if (users[id]) {
-              users[id].totalPoints = userData.totalPoints;
-            }
-          });
-        }
+        setUsers(lastJsonMessage.updatedUsers)
         return;
       case "player_disconnected":
+        //remove from user list
+        setUsers(lastJsonMessage.users);
+
         // remove disconnected player from status list
-        setPlayerStatuses(prev => {
-          const newStatuses = { ...prev };
-          delete newStatuses[lastJsonMessage.playerId];
-          return newStatuses;
-        });
+         setPlayerStatuses(lastJsonMessage.playerStatuses)
+        
         break;
       case "reset_round":
         setPrompt("");
@@ -198,25 +183,6 @@ export default function GameRound() {
     setCountdownTime(3); //3, 2, 1
     console.log("Prompt Submitted:", { prompt, timeLimit });
   };
-
-
-
-  // initialize player statuses when prompt is sent
-  useEffect(() => {
-    if (receivedPrompt && users) {
-      const initialStatuses = {};
-      Object.entries(users).forEach(([userId, userData]) => {
-        if (userId !== judgeUUID) { // Don't include the judge
-          initialStatuses[userId] = {
-            username: userData.username,
-            ready: false,
-            submittedAt: null
-          };
-        }
-      });
-      setPlayerStatuses(initialStatuses);
-    }
-  }, [receivedPrompt, users, judgeUUID]);
 
   // countdown timer effect (3-2-1)
   useEffect(() => {
@@ -493,7 +459,9 @@ export default function GameRound() {
                         marginTop: '5px',
                         padding: '5px',
                         width: '8em',
-                        textAlign: 'center'
+                        maxWidth: '96%',
+                        textAlign: 'center',
+                        justifyContent: 'center'
                       }}
                     />
                   )}
