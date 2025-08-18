@@ -5,7 +5,7 @@ const url = require('url')
 const uuidv4 = require("uuid").v4 // method that generates random id's
 require('dotenv').config()
 
-const port = 8000 // "commonly used for web servers and HTTP-based applications"
+const port = process.env.PORT || 8000 // tutorial told me to do this idk || "commonly used for web servers and HTTP-based applications"
 
 const rooms = {}; // hold all rooms and their users/connections
 
