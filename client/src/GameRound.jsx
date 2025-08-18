@@ -51,6 +51,7 @@ export default function GameRound() {
         alertShown = true;
         alert("You have disconnected from this game");
         navigate("/");
+        window.location.href = "/";
       }
     }, [isConnected, navigate]);
 
