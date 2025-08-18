@@ -24,7 +24,8 @@ const handleLoginSubmit = async (submissionData) => {
       navigate('/join');
   } else if (submissionData.type === 'create') {
     try {               
-      const response = await fetch('http://localhost:8000/create-room', { method: 'POST' }); //Next time i will remember not to hardcode this port
+      const response = await fetch(`${import.meta.env.VITE_JS_FILE}/create-room`, { method: 'POST' }); //Next time i will remember not to hardcode this port
+      //changed http://localhost:8000 to https://whiteboards-server.onrender.com
       if (!response.ok) throw new Error('Failed to create room');
 
       const data = await response.json();

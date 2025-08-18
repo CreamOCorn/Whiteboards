@@ -25,7 +25,7 @@ export function Login({ onSubmit }) {
     } else if (clickedButtonId === "Create") {
       try {
         // Call your backend to create a room
-        const response = await fetch("http://localhost:8000/create-room", {
+        const response = await fetch(`${import.meta.env.VITE_JS_FILE}/create-room`, { //changed http://localhost:8000 to https://whiteboards-server.onrender.com
           method: "POST",
         });
         if (!response.ok) throw new Error("Failed to create room");

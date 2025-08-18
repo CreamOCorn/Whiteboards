@@ -25,7 +25,7 @@ function JoinRoomies({ username, uuid, onJoin }) {
 
     try {
       // Call backend to check if room exists
-      const response = await fetch(`http://localhost:8000/check-room?code=${code}`);
+      const response = await fetch(`${import.meta.env.VITE_JS_FILE}/check-room?code=${code}`);
       if (response.ok) {
         const data = await response.json();
         console.log(data);
