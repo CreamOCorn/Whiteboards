@@ -359,7 +359,13 @@ const DrawingCanvas = ({ onDrawingSubmit, onCanvasChange, disabled, timeRemainin
           <input 
             type="color" 
             value={brushColor} 
-            onChange={(e) => setBrushColor(e.target.value)} 
+            onChange={(e) => {
+              const color = e.target.value;
+              clearTimeout(window.colorTimeout);
+              window.colorTimeout = setTimeout(() => {
+                setBrushColor(color);
+              }, 16);
+            }}
             disabled={disabled} 
             style={{ width: '100%', height: '40px' }}
           />
