@@ -10,6 +10,7 @@ const DrawingCanvas = ({ onDrawingSubmit, onCanvasChange, disabled, timeRemainin
   //all the "settings"
   const [isDrawing, setIsDrawing] = useState(false);
   const [brushSize, setBrushSize] = useState(5);
+  const [eraserSize, setEraserSize] = useState(20);
   const [brushColor, setBrushColor] = useState('#000000');
   const [tool, setTool] = useState('brush');
 
@@ -89,7 +90,7 @@ const DrawingCanvas = ({ onDrawingSubmit, onCanvasChange, disabled, timeRemainin
     const newStroke = {
       tool,
       color: brushColor,
-      size: brushSize,
+      size: (tool === 'brush' ? brushSize : eraserSize),
       path: [pos], //adding our "beginning dot" to the path
     };
     setCurrentStroke(newStroke);
@@ -104,18 +105,18 @@ const DrawingCanvas = ({ onDrawingSubmit, onCanvasChange, disabled, timeRemainin
     
     if (tool === 'eraser') {
       ctx.globalCompositeOperation = 'destination-out'; //so apparently this is how you erase
-      ctx.lineWidth = brushSize * 2; //slightly bigger than brush
+      ctx.lineWidth = (tool === 'brush' ? brushSize : eraserSize) * 2; //slightly bigger than brush
     } else {
       //if not eraser then you are drawing
       ctx.globalCompositeOperation = 'source-over'; //lets you draw "over" anything on the current canvas
       ctx.strokeStyle = brushColor;
-      ctx.lineWidth = brushSize;
+      ctx.lineWidth = (tool === 'brush' ? brushSize : eraserSize);
     }
     
     //lets us see the "brush" as a circle for the first point 
     //(position being middle of the circle, brush size/2 being radius, 0 being staring angle, 2*pi being ending angle (360 degrees))
     //this makes a full circle
-    ctx.arc(pos.x, pos.y, brushSize / 2, 0, 2 * Math.PI); 
+    ctx.arc(pos.x, pos.y, (tool === 'brush' ? brushSize : eraserSize) / 2, 0, 2 * Math.PI); 
     ctx.fill();
     ctx.globalCompositeOperation = 'source-over';
   };
@@ -374,15 +375,19 @@ const DrawingCanvas = ({ onDrawingSubmit, onCanvasChange, disabled, timeRemainin
 
       <div>
         <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
-          Size: {brushSize}px
+          Size: {tool === 'brush' ? brushSize : eraserSize}px
         </label>
         <input 
           type="range"
           className="fuckinslider" 
           min="1" 
           max="100" 
-          value={brushSize} 
-          onChange={(e) => setBrushSize(parseInt(e.target.value))} 
+          value={tool === 'brush' ? brushSize : eraserSize} 
+          onChange={(e) => {
+            const val = parseInt(e.target.value);
+            if (tool === 'brush') setBrushSize(val);
+            else setEraserSize(val);
+          }} 
           disabled={disabled}
           style={{ width: '100%' }}
         />
