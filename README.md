@@ -7,4 +7,5 @@ The website works as follows:
 6. until the judge says it's the end of the game and winners are crowned
   
 Inspired by Spilled Ink and other various youtube videos like this one: https://youtu.be/M_waadlC_64
+
 Best on desktop
