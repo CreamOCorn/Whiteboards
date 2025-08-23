@@ -160,8 +160,8 @@ export default function GameRound() {
       return;
     }
 
-    if (timeLimit < 30 || timeLimit > 3600) {
-    alert("Time limit must be between 30 and 3600 seconds");
+    if (timeLimit < 10 || timeLimit > 3600) {
+    alert("Time limit must be between 10 and 3600 seconds");
     return;
     }
 
@@ -681,7 +681,7 @@ export default function GameRound() {
               <input
                 type="number"
                 value={timeLimit}
-                min="30"
+                min="10"
                 max="3600"
                 step="1"
                 pattern="[0-9]"
