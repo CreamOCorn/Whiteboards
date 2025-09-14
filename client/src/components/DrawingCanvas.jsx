@@ -6,6 +6,7 @@ const DrawingCanvas = ({ onDrawingSubmit, onCanvasChange, disabled, timeRemainin
   // disabled: boolean to disable all drawing interactions
   //timeRemaining: # of seconds remaining (for timer display)
   const canvasRef = useRef(null); //this object holds the canvas!
+  const containerRef = useRef(null); // for responsive sizing
 
   //all the "settings"
   const [isDrawing, setIsDrawing] = useState(false);
@@ -14,11 +15,56 @@ const DrawingCanvas = ({ onDrawingSubmit, onCanvasChange, disabled, timeRemainin
   const [brushColor, setBrushColor] = useState('#000000');
   const [tool, setTool] = useState('brush');
 
+  // canvas dimensions for 4:3 ratio
+  const [canvasDimensions, setCanvasDimensions] = useState({ width: 800, height: 600 });
+
   //all the canvas "brushstrokes"
   const [strokes, setStrokes] = useState([]);      // every stroke made
   const [redoStack, setRedoStack] = useState([]);  // every stroke undone
   const [currentStroke, setCurrentStroke] = useState(null); // current stroke
   const [lastPoint, setLastPoint] = useState(null); // last mouse position tracking
+
+  // calculate responsive canvas size maintaining 4:3 ratio
+  const calculateCanvasSize = () => {
+    const isMobileView = window.innerWidth <= 768;
+    
+    if (!isMobileView) {
+      // Desktop: always use 800x600 (perfect 4:3 ratio)
+      return { width: 800, height: 600 };
+    } else {
+      // Mobile: responsive sizing but maintain 4:3 ratio
+      const availableWidth = window.innerWidth * 0.9; // 90% of screen width
+      const availableHeight = window.innerHeight * 0.5; // 50% of screen height
+      
+      // maintain 4:3 ratio
+      let width = availableWidth;
+      let height = (availableWidth * 3) / 4;
+      
+      if (height > availableHeight) {
+        height = availableHeight;
+        width = (availableHeight * 4) / 3;
+      }
+      
+      // ensure minimum size for usability
+      width = Math.max(320, width);
+      height = Math.max(240, height);
+      
+      return { width: Math.floor(width), height: Math.floor(height) };
+    }
+  };
+
+  // handle window resize
+  useEffect(() => {
+    const handleResize = () => {
+      const newDimensions = calculateCanvasSize();
+      setCanvasDimensions(newDimensions);
+    };
+
+    window.addEventListener('resize', handleResize);
+    handleResize(); // calculate initial size
+    
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // helper function to update parent with current canvas
   const updateParentCanvas = () => {
@@ -32,8 +78,8 @@ const DrawingCanvas = ({ onDrawingSubmit, onCanvasChange, disabled, timeRemainin
         console.error("Error updating parent canvas:", error);
         // blank canvas if all else fails
         const tempCanvas = document.createElement('canvas'); //isnt it amazing there is literally a canvas element
-        tempCanvas.width = 800;
-        tempCanvas.height = 600;
+        tempCanvas.width = canvasDimensions.width;
+        tempCanvas.height = canvasDimensions.height;
         const ctx = tempCanvas.getContext('2d'); 
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
@@ -42,23 +88,28 @@ const DrawingCanvas = ({ onDrawingSubmit, onCanvasChange, disabled, timeRemainin
     }
   };
 
-  // setup canvas on mount
+  // setup canvas on mount and when dimensions change
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     
     //blank canvas
-    canvas.width = 800;
-    canvas.height = 600;
+    canvas.width = canvasDimensions.width;
+    canvas.height = canvasDimensions.height;
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // redraw existing strokes on resize
+    if (strokes.length > 0) {
+      redrawCanvas(strokes);
+    }
     
     // send initial blank canvas to parent (using setTimeout to give some buffer time)
     setTimeout(() => {
       updateParentCanvas();
     }, 100);
-  }, []);
+  }, [canvasDimensions]);
 
   // always update parent whenever the component re-renders (aka at every modification)
   useEffect(() => {
@@ -67,7 +118,7 @@ const DrawingCanvas = ({ onDrawingSubmit, onCanvasChange, disabled, timeRemainin
     }
   });
 
-  // get mouse coordinates relative to canvas
+  // get mouse/touch coordinates relative to canvas
   const getCursor = (e) => {
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
@@ -285,8 +336,8 @@ const DrawingCanvas = ({ onDrawingSubmit, onCanvasChange, disabled, timeRemainin
       console.error("Error submitting drawing:", error);
       // create fallback blank canvas there's so many of these
       const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = 800;
-      tempCanvas.height = 600;
+      tempCanvas.width = canvasDimensions.width;
+      tempCanvas.height = canvasDimensions.height;
       const ctx = tempCanvas.getContext('2d');
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
@@ -294,22 +345,22 @@ const DrawingCanvas = ({ onDrawingSubmit, onCanvasChange, disabled, timeRemainin
     }
   };
 
-  // touch handlers
+  // touch handlers with scroll prevention ONLY for canvas
   //upon mousedown start stroke
   const handleTouchStart = (e) => {
-    e.preventDefault();
+    e.preventDefault(); // prevent scrolling ONLY on canvas
     const touch = e.touches[0]; //first touch point in case.. mobile users 
     startDrawing({ clientX: touch.clientX, clientY: touch.clientY });
   };
   //upon mouse drag continue stroke
   const handleTouchMove = (e) => {
-    e.preventDefault();
+    e.preventDefault(); // prevent scrolling ONLY on canvas
     const touch = e.touches[0];
     draw({ clientX: touch.clientX, clientY: touch.clientY });
   };
   //upon mouseup stop stroke
   const handleTouchEnd = (e) => {
-    e.preventDefault();
+    e.preventDefault(); // prevent scrolling ONLY on canvas
     stopDrawing();
   };
 
@@ -331,22 +382,34 @@ const DrawingCanvas = ({ onDrawingSubmit, onCanvasChange, disabled, timeRemainin
     return () => window.removeEventListener('keydown', keyHandler);
   }, [strokes, redoStack, disabled]);
 
+  // determine if we should use mobile layout
+  const isMobile = window.innerWidth <= 1000;
+
   return (
-<div className="drawing-canvas-container" style={{ textAlign: 'center' }}>
+<div className="drawing-canvas-container" style={{ textAlign: 'center' }} ref={containerRef}>
   {/* Main container with canvas and side toolbars */}
-  <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'stretch', gap: '20px', marginTop: '-1vh'}}>
+  <div style={{ 
+    display: 'flex', 
+    flexDirection: isMobile ? 'column' : 'row',
+    justifyContent: 'center', 
+    alignItems: isMobile ? 'center' : 'stretch', 
+    gap: isMobile ? '10px' : '20px', 
+    marginTop: '-1vh'
+  }}>
     
     {/* Left toolbar - Drawing tools */}
     <div style={{ 
       display: 'flex', 
-      flexDirection: 'column', 
-      gap: '3vh', 
-      padding: '1vw', 
-      paddingTop:'8vh',
+      flexDirection: isMobile ? 'row' : 'column', 
+      gap: isMobile ? '10px' : '3vh', 
+      padding: isMobile ? '10px' : '1vw', 
+      paddingTop: isMobile ? '10px' : '6vh',
       backgroundColor: '#f5f5f5', 
-      width: '10vw'
+      width: isMobile ? 'auto' : '10vw',
+      flexWrap: isMobile ? 'wrap' : 'nowrap',
+      justifyContent: isMobile ? 'center' : 'flex-start'
     }}>
-      <div>
+      <div style={{ minWidth: isMobile ? '100px' : 'auto' }}>
         <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Tool:</label>
         <select value={tool} onChange={(e) => setTool(e.target.value)} disabled={disabled} style={{ width: '100%' }}>
           <option value="brush">Marker</option>
@@ -354,12 +417,13 @@ const DrawingCanvas = ({ onDrawingSubmit, onCanvasChange, disabled, timeRemainin
         </select>
       </div>
 
-      {tool === 'brush' && (
-        <div>
-          <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>Color:</label>
-          <input 
-            type="color" 
-            value={brushColor} 
+        {tool === 'brush' && (
+        <div style={{ minWidth: isMobile ? '90px' : '80px' }}>
+          <label style={{ display: 'block', fontWeight: 'bold' }}>Color:</label>
+
+          <input
+            type="color"
+            value={brushColor}
             onChange={(e) => {
               const color = e.target.value;
               clearTimeout(window.colorTimeout);
@@ -367,14 +431,40 @@ const DrawingCanvas = ({ onDrawingSubmit, onCanvasChange, disabled, timeRemainin
                 setBrushColor(color);
               }, 16);
             }}
-            disabled={disabled} 
+            disabled={disabled}
             style={{ width: '100%', height: '40px' }}
           />
+
+          {/* color palette */}
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(3, 1fr)', 
+            gap: '4px'
+          }}>
+            {['#000000', '#ff0000', '#ffa500', '#ffff00', '#008000', '#0000ff', '#800080', '#ffc0cb', '#8b4513'].map((color, index) => (
+              <button
+                key={index}
+                onClick={() => setBrushColor(color)}
+                disabled={disabled}
+                style={{
+                  width: '100%',
+                  height: '25px', 
+                  minHeight: '25px', 
+                  padding: '0', 
+                  margin: '0', 
+                  backgroundColor: color,
+                  border: brushColor === color ? '3px solid #333' : '3px solid #d6d6d6', 
+                  cursor: disabled ? 'not-allowed' : 'pointer',
+                  borderRadius: '0' // Remove border radius for seamless connection
+                }}
+                title={['Black', 'Red', 'Orange', 'Yellow', 'Green', 'Blue', 'Purple', 'Pink', 'Brown'][index]}
+              />
+            ))}
+          </div>
         </div>
       )}
-
-      <div>
-        <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>
+      <div style={{ minWidth: isMobile ? '120px' : 'auto' }}>
+        <label style={{ display: 'block', fontWeight: 'bold' }}>
           Size: {tool === 'brush' ? brushSize : eraserSize}px
         </label>
         <input 
@@ -394,12 +484,16 @@ const DrawingCanvas = ({ onDrawingSubmit, onCanvasChange, disabled, timeRemainin
       </div>
     </div>
 
-    {/* Canvas in the center */}
-    <div style={{ border: '2px solid #ccc', display: 'inline-block'}}>
+    {/* Canvas in the center - THIS is where touchAction is disabled */}
+    <div style={{ 
+      border: '2px solid #ccc', 
+      display: 'inline-block',
+      touchAction: 'none' // Only prevent touch actions on the canvas container
+    }}>
       <canvas
         ref={canvasRef}
-        width={800}
-        height={600}
+        width={canvasDimensions.width}
+        height={canvasDimensions.height}
         onMouseDown={startDrawing}
         onMouseMove={draw}
         onMouseUp={stopDrawing}
@@ -407,24 +501,30 @@ const DrawingCanvas = ({ onDrawingSubmit, onCanvasChange, disabled, timeRemainin
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        style={{ cursor: disabled ? 'not-allowed' : 'crosshair', display: 'block' }}
+        style={{ 
+          cursor: disabled ? 'not-allowed' : 'crosshair', 
+          display: 'block',
+          touchAction: 'none' // Prevent scrolling on the actual canvas element
+        }}
       />
     </div>
 
     {/* Right toolbar - Action buttons */}
     <div style={{ 
       display: 'flex', 
-      flexDirection: 'column', 
-      gap: '8vh', 
+      flexDirection: isMobile ? 'row' : 'column', 
+      gap: isMobile ? '10px' : '8vh', 
       padding: '15px', 
-      paddingTop: '10vh',
-      paddingBottom: '10vh',
+      paddingTop: isMobile ? '15px' : '10vh',
+      paddingBottom: isMobile ? '15px' : '10vh',
       backgroundColor: '#f5f5f5', 
-      width: '10vw'
+      width: isMobile ? 'auto' : '10vw',
+      justifyContent: isMobile ? 'center' : 'flex-start'
     }}>
       <button 
         onClick={clearCanvas} 
         disabled={disabled}
+        style={{ minWidth: isMobile ? '60px' : 'auto' }}
       >
         Clear
       </button>
@@ -432,6 +532,7 @@ const DrawingCanvas = ({ onDrawingSubmit, onCanvasChange, disabled, timeRemainin
       <button 
         onClick={handleUndo} 
         disabled={disabled || strokes.length === 0}
+        style={{ minWidth: isMobile ? '60px' : 'auto' }}
       >
         Undo
       </button>
@@ -439,6 +540,7 @@ const DrawingCanvas = ({ onDrawingSubmit, onCanvasChange, disabled, timeRemainin
       <button 
         onClick={handleRedo} 
         disabled={disabled || redoStack.length === 0}
+        style={{ minWidth: isMobile ? '60px' : 'auto' }}
       >
         Redo
       </button>
@@ -453,7 +555,7 @@ const DrawingCanvas = ({ onDrawingSubmit, onCanvasChange, disabled, timeRemainin
         </button>
 
         {timeRemaining !== null && (
-          <div style={{ marginTop: '1vh', color: timeRemaining <= 10 ? 'red' : 'black', fontSize: 'xx-large' }}>
+          <div style={{ marginTop: '1vh', color: timeRemaining <= 10 ? 'red' : 'black', fontSize: isMobile ? 'large' : 'xx-large' }}>
             Time remaining: {Math.floor(timeRemaining / 60)}:{(timeRemaining % 60).toString().padStart(2, '0')}
           </div>
         )}
