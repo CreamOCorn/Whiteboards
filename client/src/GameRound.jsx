@@ -227,41 +227,24 @@ export default function GameRound() {
         // auto-submit drawing if player hasn't submitted yet
         if (!drawingSubmitted && !isJudge) {
           console.log("Auto-submitting player:", username);
-
+          
           setTimeout(() => {
-            //looks for the canvas
-            let canvas = document.querySelector('canvas') 
+            // Get canvas directly using your existing selectors
+            const canvas = document.querySelector('canvas') 
               || document.querySelector('.drawing-canvas-container canvas') 
               || document.querySelector('[style*="cursor"]');
-
-            console.log("Canvas found:", !!canvas);
+            
+              console.log("Canvas found:", !!canvas);
 
             if (canvas) {
-              //and then submits whatever tf is there
-              canvas.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
-              setTimeout(() => {
-                const directCanvasData = canvas.toDataURL('image/png');
-                console.log("Auto-submitting player:", username, "Canvas data length:", directCanvasData.length);
-                handleSubmitDrawing(directCanvasData, true);
-              }, 50);
+              const latestCanvasData = canvas.toDataURL('image/png');
+              console.log("Auto-submit: Fresh canvas data length:", latestCanvasData.length);
+              handleSubmitDrawing(latestCanvasData, true);
             } else {
-              console.log("Still no canvas found, falling back to currentCanvasData");
-              //THE MANUAL EMPTY CANVAS
-              const fallbackData = currentCanvasData || (() => {
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = 800;
-                tempCanvas.height = 600;
-                const ctx = tempCanvas.getContext('2d');
-                ctx.fillStyle = '#ffffff';
-                ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
-                return tempCanvas.toDataURL('image/png');
-              })();
-
-              handleSubmitDrawing(fallbackData, true);
+              console.log("No canvas found for auto-submit");
+              handleSubmitDrawing(null, true); // Will use fallback logic
             }
-          }, 50);
-        } else {
-          console.log("Skipping auto-submit for:", username, "- already submitted or is judge");
+          }, 100);
         }
 
         // judge auto-requests review
@@ -279,11 +262,6 @@ export default function GameRound() {
 
     return () => clearInterval(interval);
   }, [timerStarted, receivedPrompt?.startTime, receivedPrompt?.timeLimit, drawingSubmitted, isJudge]);
-
-  //Debugging purposes
-  // useEffect(() => {
-  //     console.log("currentCanvasData updated:", currentCanvasData ? `Length: ${currentCanvasData.length}` : "null");
-  //   }, [currentCanvasData]);
 
   // handle drawing submission
   const handleSubmitDrawing = (drawingData, isAutoSubmit = false) => {
@@ -308,16 +286,37 @@ export default function GameRound() {
       finalDrawingData = canvas.toDataURL('image/png');
     }
 
-    sendJsonMessage({
-      type: "submit_drawing",
-      drawingData: finalDrawingData,
-      playerId: uuid,
-      username: username,
-      isAutoSubmit: isAutoSubmit
-    });
+    const dataToSend = finalDrawingData;
 
-    setDrawingSubmitted(true);
-    setSubmittedDrawingData(finalDrawingData);
+    // For autosubmit, show submission screen immediately, then send after 7 seconds
+    if (isAutoSubmit) {
+      setDrawingSubmitted(true);
+      setSubmittedDrawingData(dataToSend);
+      
+      setTimeout(() => {
+        sendJsonMessage({
+          type: "submit_drawing",
+          drawingData: dataToSend,
+          playerId: uuid,
+          username: username,
+          isAutoSubmit: isAutoSubmit
+        });
+        console.log("Auto-submit: Sending to server");
+      });
+    } else {
+      // manual submit sends immediately
+      sendJsonMessage({
+        type: "submit_drawing",
+        drawingData: finalDrawingData,
+        playerId: uuid,
+        username: username,
+        isAutoSubmit: isAutoSubmit
+      });
+      
+      setDrawingSubmitted(true);
+      setSubmittedDrawingData(finalDrawingData);
+    }
+
     console.log("Drawing submitted", isAutoSubmit ? "(auto)" : "(manual)", "Data length:", finalDrawingData?.length);
   };
 
@@ -357,7 +356,7 @@ export default function GameRound() {
   }
 
   // review screen (shown to everyone)
-  if (gamePhase === 'review') {
+  if (gamePhase === 'review') { 
   return (
     <div className="GameRound Review">
       <div className="Top">
@@ -389,11 +388,13 @@ export default function GameRound() {
               backgroundColor: 'white'
             }}>
               <p style={{marginTop: '0vh', marginBottom: '1vh'}}>{drawingEntry?.username || status.username || 'Unknown'} - {totalPoints}pts</p>
-              {drawingEntry?.drawingData ? (
+                
+              {(drawingEntry?.drawingData || drawingEntry?.drawing || drawingEntry) ? (
+                //call me a genius for brute forcing which way works
                 <>
                   <img 
-                    src={drawingEntry.drawingData} 
-                    alt={`${drawingEntry.username}'s drawing`}
+                    src={drawingEntry?.drawingData || drawingEntry?.drawing || drawingEntry} 
+                    alt={`${drawingEntry?.username || status.username}'s drawing`}
                     style={{ 
                       maxWidth: '100%', 
                       height: 'auto',
