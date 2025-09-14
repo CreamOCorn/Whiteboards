@@ -161,6 +161,7 @@ const DrawingCanvas = ({ onDrawingSubmit, onCanvasChange, disabled, timeRemainin
       //if not eraser then you are drawing
       ctx.globalCompositeOperation = 'source-over'; //lets you draw "over" anything on the current canvas
       ctx.strokeStyle = brushColor;
+      ctx.fillStyle = brushColor;
       ctx.lineWidth = (tool === 'brush' ? brushSize : eraserSize);
     }
     
@@ -265,12 +266,13 @@ const DrawingCanvas = ({ onDrawingSubmit, onCanvasChange, disabled, timeRemainin
       ctx.globalCompositeOperation = 'source-over';
       ctx.strokeStyle = stroke.color;
       ctx.lineWidth = stroke.size;
+      ctx.fillStyle = stroke.color; 
     }
 
     if (stroke.path.length === 1) {
-      // Ssngle point draws a circle
+      // single point draws a circle 
       ctx.arc(stroke.path[0].x, stroke.path[0].y, stroke.size / 2, 0, 2 * Math.PI);
-      ctx.fill();
+      ctx.fill(); 
     } else {
       // multiple points draws lines
       ctx.moveTo(stroke.path[0].x, stroke.path[0].y);
